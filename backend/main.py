@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.chat import router
+from api.chat import router as chat_router
+from api.models import router as models_router
 
-app = FastAPI()
+app = FastAPI(title="基金研究平台 API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,4 +13,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
+app.include_router(models_router, prefix="/api")

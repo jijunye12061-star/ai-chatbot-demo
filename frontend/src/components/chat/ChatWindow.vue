@@ -3,7 +3,7 @@
     <div v-if="messages.length === 0" class="empty-state">
       <div class="empty-icon">✦</div>
       <h2 class="empty-title">有什么可以帮你？</h2>
-      <p class="empty-sub">基于 DeepSeek-V3，可回答问题、分析数据、编写代码</p>
+      <p class="empty-sub">基于 DeepSeek-V3，可回答金融问题、解读数据、分析市场</p>
       <div class="suggestions">
         <div
           class="suggestion-card"
@@ -35,9 +35,9 @@ const props = defineProps({ messages: Array })
 defineEmits(['suggest'])
 
 const suggestions = [
-  { icon: '💡', text: '用 Python 实现一个快速排序算法' },
-  { icon: '📊', text: '解释一下什么是 Transformer 架构' },
-  { icon: '✍️', text: '帮我写一封简洁的项目进展邮件' },
+  { icon: '📈', text: '最近收益率曲线有哪些值得关注的变化？' },
+  { icon: '🏦', text: '什么是债券久期，它如何影响基金净值？' },
+  { icon: '📊', text: '帮我解释一下基金资产配置数据的含义' },
 ]
 
 const windowRef = ref(null)
@@ -62,13 +62,8 @@ watch(
   scrollbar-color: #cbd5e1 transparent;
 }
 
-.chat-window::-webkit-scrollbar {
-  width: 5px;
-}
-.chat-window::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
-}
+.chat-window::-webkit-scrollbar { width: 5px; }
+.chat-window::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
 .empty-state {
   display: flex;
@@ -133,13 +128,6 @@ watch(
   transform: translateY(-1px);
 }
 
-.s-icon {
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.s-text {
-  font-size: 14px;
-  color: #334155;
-}
+.s-icon { font-size: 18px; flex-shrink: 0; }
+.s-text { font-size: 14px; color: #334155; }
 </style>

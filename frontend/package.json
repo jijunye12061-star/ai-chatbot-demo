@@ -1,6 +1,6 @@
 {
-  "name": "ai-chatbot-frontend",
-  "version": "0.0.1",
+  "name": "fund-platform-frontend",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "vue": "^3.4.0",
+    "vue-router": "^4.3.0",
+    "pinia": "^2.1.0",
     "element-plus": "^2.9.0",
     "markdown-it": "^14.0.0"
   },
