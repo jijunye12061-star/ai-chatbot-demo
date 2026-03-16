@@ -97,10 +97,71 @@ project/
 
 | 文件 | 职责 |
 |------|------|
-| `services/llm_service.py` | 唯一调用 LLM 的地方：拼接 messages，调用 OpenAI 兼容 SDK，yield SSE chunk |
-| `services/db_service.py` | 数据库查询封装（当前为 TODO 占位）：`get_connection()`、`query_yield_curve()`、`query_nav_history()` |
+| `services/llm_service.py` | 原始 LLM 调用（保留，不删除，兼容旧代码） |
+| `services/db_service.py` | 数据库查询封装（TODO 占位，新代码用 `db/connection.py`） |
+| `services/model_data_service.py` | 模型展示页面数据查询：`get_yield_curve_data()` / `get_nav_history()` |
 
-> `tools/` 目录（Phase 3 用）：AI Function Calling 的 tool 定义，尚未创建。
+### 数据库层 (`db/`) — 公共层，AI + 页面共用
+
+| 文件 | 职责 |
+|------|------|
+| `db/connection.py` | `get_connection(readonly)` / `execute_query()`，支持只读账号切换 |
+| `db/safety.py` | SQL 安全校验：危险关键词检测 → 单语句 → SELECT only → 白名单表 → 子查询深度 → LIMIT 注入 |
+
+### LLM 层 (`llm/`)
+
+| 文件 | 职责 |
+|------|------|
+| `llm/client.py` | AsyncOpenAI 封装：`chat_completion()`（非流式）、`stream_text()`（流式 async generator） |
+
+### 多 Agent 层 (`agents/`)
+
+| 文件 | 职责 |
+|------|------|
+| `agents/orchestrator.py` | 总调度入口：message + history → RouterAgent → 分发到具体 Agent |
+| `agents/base.py` | BaseAgent 基类：Function Calling 循环（检测 tool_calls → 执行 → 流式最终回复） |
+| `agents/router_agent.py` | 意图路由：LLM tool_call + 关键词兜底，返回 agent_key |
+| `agents/chat_agent.py` | 兜底闲聊 Agent，无工具 |
+| `agents/data_query_agent.py` | 数据查询 Agent，注入 db_schema，使用 execute_sql 工具 |
+| `agents/fund_screener_agent.py` | 基金筛选 Agent，使用 filter_funds 工具 |
+| `agents/report_agent.py` | 报告生成 Agent，先提示再调用 generate_fund_report 工具 |
+
+### 工具层 (`tools/`)
+
+| 文件 | 职责 |
+|------|------|
+| `tools/registry.py` | 工具注册表，延迟加载避免循环导入 |
+| `tools/definitions.py` | 所有工具的 JSON Schema：route_to / execute_sql / filter_funds / generate_fund_report |
+| `tools/sql_executor.py` | LLM SQL → safety.validate_sql → 只读执行 → JSON 结果 |
+| `tools/fund_filter.py` | 代码生成 SQL 筛选基金（不走 LLM，直接拼 SQL） |
+| `tools/report_gen.py` | 按 fund_report.json 模板，parallel_group 并行生成各节报告 |
+
+### Prompt 文件 (`prompts/`)
+
+| 文件 | 用途 |
+|------|------|
+| `prompts/chat.md` | ChatAgent system prompt |
+| `prompts/router.md` | RouterAgent system prompt，定义4种意图和路由规则 |
+| `prompts/data_query.md` | DataQueryAgent prompt，含 `{db_schema}` 占位符 |
+| `prompts/fund_screener.md` | FundScreenerAgent prompt |
+| `prompts/report_writer.md` | ReportAgent system prompt |
+| `prompts/report_basic.md` | 基础信息节 prompt |
+| `prompts/report_nav.md` | 净值表现节 prompt |
+| `prompts/report_portfolio.md` | 持仓结构节 prompt |
+| `prompts/report_summary.md` | 综合评价节 prompt |
+
+### 模板文件 (`templates/`)
+
+| 文件 | 用途 |
+|------|------|
+| `templates/db_schema.md` | 6张表字段说明，注入 DataQueryAgent prompt |
+| `templates/fund_report.json` | 报告节定义（id/title/sql/parallel_group/depends_on） |
+
+### 测试 (`tests/`)
+
+| 文件 | 用途 |
+|------|------|
+| `tests/test_sql_safety.py` | SQL 安全校验单测（14个 case，无需 DB/LLM） |
 
 ---
 
@@ -116,16 +177,19 @@ project/
 
 ## 关键数据流
 
-### AI 问答流
+### AI 问答流（多 Agent 架构）
 ```
 用户输入
   → ChatInput.vue (emit 'send')
   → ChatView.vue → useChatStore().send()
   → api/chat.js sendMessage() → POST /api/chat
-  → backend: api/chat.py → llm_service.stream_chat()
-  → OpenAI SDK → LLM API (SSE)
-  → 逐 chunk 回传 → onChunk() 追加到 message.content
-  → MessageBubble.vue 实时渲染（流式期间不解析 Markdown）
+  → backend: api/chat.py (async) → orchestrator.run()
+    → RouterAgent.classify() → 识别意图（chat/data_query/fund_screen/report）
+    → 分发到对应 Agent.run()
+      → BaseAgent FC循环：chat_completion(tools) → 有 tool_calls → 执行工具 → 继续
+      → 最终：stream_text() 流式输出
+  → yield SSE chunks → onChunk() 追加到 message.content
+  → MessageBubble.vue 实时渲染
   → onDone() 触发 Markdown 渲染
 ```
 

@@ -108,7 +108,7 @@
     <div class="table-section">
       <div class="section-header">
         <h3 class="section-title">各期限收益率数据</h3>
-        <span class="section-date">数据日期：2026-03-12</span>
+        <span class="section-date">数据日期：{{ dataDate }}{{ isLoading ? ' 加载中...' : '' }}</span>
       </div>
       <div class="data-table-wrapper">
         <table class="data-table">
@@ -147,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 const selectedDate = ref('1m')
 const dateOptions = [
@@ -157,12 +157,72 @@ const dateOptions = [
   { label: '近 1 年', value: '1y' },
 ]
 
-const kpis = [
+// ── API 数据状态 ──────────────────────────────────────────────────────────────
+const dataDate = ref('--')
+const isLoading = ref(false)
+const apiRows = ref([])  // 来自后端的原始行数据
+
+// ── Mock 数据（API 不可用时的降级数据）──────────────────────────────────────────
+const MOCK_KPIS = [
   { label: '10Y 国债收益率', value: '2.85%', change: '+0.5 BP', changeType: 'up' },
   { label: '2Y 国债收益率', value: '2.53%', change: '+0.3 BP', changeType: 'up' },
   { label: '10Y-2Y 利差', value: '32 BP', change: '+0.2 BP', changeType: 'neutral' },
   { label: '曲线形态', value: '正斜率', change: '结构稳定', changeType: 'neutral', color: '#6366f1' },
 ]
+const MOCK_TABLE = [
+  { tenor: '1M',  today: '1.60%', d1: '+0.0', m1: '+5.0',  y1: '-20.0', high: '1.80%', low: '1.50%' },
+  { tenor: '3M',  today: '1.70%', d1: '+0.5', m1: '+5.0',  y1: '-20.0', high: '1.95%', low: '1.58%' },
+  { tenor: '6M',  today: '1.90%', d1: '+0.0', m1: '+5.0',  y1: '-15.0', high: '2.10%', low: '1.78%' },
+  { tenor: '1Y',  today: '2.00%', d1: '+0.5', m1: '+2.0',  y1: '-20.0', high: '2.22%', low: '1.88%' },
+  { tenor: '2Y',  today: '2.53%', d1: '+0.3', m1: '+5.0',  y1: '-12.0', high: '2.70%', low: '2.40%' },
+  { tenor: '3Y',  today: '2.60%', d1: '+0.5', m1: '+3.0',  y1: '-12.0', high: '2.78%', low: '2.48%' },
+  { tenor: '5Y',  today: '2.72%', d1: '+0.3', m1: '+4.0',  y1: '-13.0', high: '2.90%', low: '2.58%' },
+  { tenor: '7Y',  today: '2.79%', d1: '+0.5', m1: '+3.0',  y1: '-13.0', high: '2.96%', low: '2.65%' },
+  { tenor: '10Y', today: '2.85%', d1: '+0.5', m1: '+3.0',  y1: '-13.0', high: '3.05%', low: '2.70%' },
+]
+const MOCK_RAW1 = [1.60, 1.70, 1.90, 2.00, 2.53, 2.60, 2.72, 2.79, 2.85]
+const MOCK_RAW2 = [1.55, 1.65, 1.85, 1.98, 2.48, 2.57, 2.68, 2.76, 2.82]
+const MOCK_RAW3 = [1.80, 1.90, 2.05, 2.20, 2.65, 2.72, 2.85, 2.92, 2.98]
+
+// ── 动态数据（优先 API，降级 Mock）──────────────────────────────────────────────
+const kpis = computed(() => {
+  if (apiRows.value.length === 0) return MOCK_KPIS
+  // 从真实数据构建 KPI（使用收益率数据中的统计）
+  const latest = apiRows.value[0]
+  if (!latest) return MOCK_KPIS
+  const ret1y = latest.c_ret_1y != null ? (latest.c_ret_1y * 100).toFixed(2) + '%' : '--'
+  const ret1m = latest.c_ret_1m != null ? (latest.c_ret_1m * 100).toFixed(2) + '%' : '--'
+  return [
+    { label: '最新净值', value: latest.c_nav?.toFixed(4) ?? '--', change: '最新', changeType: 'neutral' },
+    { label: '近 1 月收益', value: ret1m, change: '近1月', changeType: parseFloat(ret1m) >= 0 ? 'up' : 'down' },
+    { label: '近 1 年收益', value: ret1y, change: '近1年', changeType: parseFloat(ret1y) >= 0 ? 'up' : 'down' },
+    { label: '数据基金数', value: apiRows.value.length + ' 支', change: '已加载', changeType: 'neutral', color: '#6366f1' },
+  ]
+})
+
+const tableData = computed(() => {
+  if (apiRows.value.length === 0) return MOCK_TABLE
+  // 将 API 数据转为表格格式
+  return apiRows.value.slice(0, 15).map(row => ({
+    tenor: row.c_fd_code,
+    today: row.c_nav?.toFixed(4) ?? '--',
+    d1: row.c_ret_1d != null ? (row.c_ret_1d * 100).toFixed(2) : '--',
+    m1: row.c_ret_1m != null ? (row.c_ret_1m * 100).toFixed(2) : '--',
+    y1: row.c_ret_1y != null ? (row.c_ret_1y * 100).toFixed(2) : '--',
+    high: '--',
+    low: '--',
+  }))
+})
+
+// ── 图表计算（保持 SVG 渲染，数据源切换）───────────────────────────────────────
+const rawData1 = computed(() => {
+  if (apiRows.value.length >= 9) {
+    return apiRows.value.slice(0, 9).map(r => r.c_ret_1y != null ? parseFloat((r.c_ret_1y * 100).toFixed(2)) : 2.0)
+  }
+  return MOCK_RAW1
+})
+const rawData2 = computed(() => MOCK_RAW2)
+const rawData3 = computed(() => MOCK_RAW3)
 
 const curveLegends = [
   { label: '今日', color: '#6366f1' },
@@ -174,45 +234,45 @@ const yLabels = ['3.5%', '3.0%', '2.5%', '2.0%', '1.5%']
 const histYLabels = ['3.2%', '2.8%', '2.4%', '2.0%']
 const tenors = ['1M', '3M', '6M', '1Y', '2Y', '3Y', '5Y', '7Y', '10Y']
 
-// 收益率曲线数据点（SVG坐标）
-// 原始数据：1M=1.6%, 3M=1.7%, 6M=1.9%, 1Y=2.0%, 2Y=2.53%, 3Y=2.6%, 5Y=2.72%, 7Y=2.79%, 10Y=2.85%
-// Y轴范围 1.5%-3.5% => 180px高度，每0.5%=36px
-// Y坐标 = 10 + (3.5 - value) / 0.5 * 36
-
 function toY(pct) {
   return 10 + (3.5 - pct) / 0.5 * 36
 }
 
-const rawData1 = [1.60, 1.70, 1.90, 2.00, 2.53, 2.60, 2.72, 2.79, 2.85] // 今日
-const rawData2 = [1.55, 1.65, 1.85, 1.98, 2.48, 2.57, 2.68, 2.76, 2.82] // 一月前
-const rawData3 = [1.80, 1.90, 2.05, 2.20, 2.65, 2.72, 2.85, 2.92, 2.98] // 一年前
+const curve1Points = computed(() => rawData1.value.map((v, i) => `${50 + i * 58},${toY(v)}`).join(' '))
+const curve2Points = computed(() => rawData2.value.map((v, i) => `${50 + i * 58},${toY(v)}`).join(' '))
+const curve3Points = computed(() => rawData3.value.map((v, i) => `${50 + i * 58},${toY(v)}`).join(' '))
+const curve1Dots = computed(() => rawData1.value.map((v, i) => ({ x: 50 + i * 58, y: toY(v) })))
 
-const curve1Points = computed(() => rawData1.map((v, i) => `${50 + i * 58},${toY(v)}`).join(' '))
-const curve2Points = computed(() => rawData2.map((v, i) => `${50 + i * 58},${toY(v)}`).join(' '))
-const curve3Points = computed(() => rawData3.map((v, i) => `${50 + i * 58},${toY(v)}`).join(' '))
-const curve1Dots = computed(() => rawData1.map((v, i) => ({ x: 50 + i * 58, y: toY(v) })))
-
-// 历史走势（12个月数据，简单模拟）
 const histRaw = [3.05, 3.10, 2.98, 2.90, 2.85, 2.80, 2.75, 2.78, 2.82, 2.80, 2.83, 2.85]
 function toHistY(v) { return 8 + (3.2 - v) / 0.4 * 36 }
 function toHistX(i) { return 30 + i * (220 / 11) }
 const histPoints = computed(() => histRaw.map((v, i) => `${toHistX(i)},${toHistY(v)}`).join(' '))
 const histAreaPath = computed(() => {
-  const pts = histRaw.map((v, i) => `${toHistX(i)},${toHistY(v)}`).join(' ')
   return `M${toHistX(0)},${toHistY(histRaw[0])} ${histRaw.map((v, i) => `L${toHistX(i)},${toHistY(v)}`).join(' ')} L${toHistX(11)},160 L${toHistX(0)},160 Z`
 })
 
-const tableData = [
-  { tenor: '1M',  today: '1.60%', d1: '+0.0', m1: '+5.0',  y1: '-20.0', high: '1.80%', low: '1.50%' },
-  { tenor: '3M',  today: '1.70%', d1: '+0.5', m1: '+5.0',  y1: '-20.0', high: '1.95%', low: '1.58%' },
-  { tenor: '6M',  today: '1.90%', d1: '+0.0', m1: '+5.0',  y1: '-15.0', high: '2.10%', low: '1.78%' },
-  { tenor: '1Y',  today: '2.00%', d1: '+0.5', m1: '+2.0',  y1: '-20.0', high: '2.22%', low: '1.88%' },
-  { tenor: '2Y',  today: '2.53%', d1: '+0.3', m1: '+5.0',  y1: '-12.0', high: '2.70%', low: '2.40%' },
-  { tenor: '3Y',  today: '2.60%', d1: '+0.5', m1: '+3.0',  y1: '-12.0', high: '2.78%', low: '2.48%' },
-  { tenor: '5Y',  today: '2.72%', d1: '+0.3', m1: '+4.0',  y1: '-13.0', high: '2.90%', low: '2.58%' },
-  { tenor: '7Y',  today: '2.79%', d1: '+0.5', m1: '+3.0',  y1: '-13.0', high: '2.96%', low: '2.65%' },
-  { tenor: '10Y', today: '2.85%', d1: '+0.5', m1: '+3.0',  y1: '-13.0', high: '3.05%', low: '2.70%' },
-]
+// ── 数据加载 ──────────────────────────────────────────────────────────────────
+async function loadData() {
+  isLoading.value = true
+  try {
+    const res = await fetch('/api/models/yield-curve/data')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    if (data.rows && data.rows.length > 0) {
+      apiRows.value = data.rows
+      dataDate.value = data.trade_date || '--'
+    }
+  } catch (e) {
+    console.warn('[YieldCurve] API 加载失败，使用 mock 数据:', e.message)
+    dataDate.value = '2026-03-12（mock）'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadData()
+})
 </script>
 
 <style scoped>

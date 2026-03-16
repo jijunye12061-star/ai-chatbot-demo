@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, HTTPException
+from typing import Optional
 
 router = APIRouter()
 
@@ -46,6 +47,31 @@ def list_models():
 
 
 @router.get("/models/{model_id}/data")
-def get_model_data(model_id: str):
-    """获取指定模型的数据（占位，后续接入 DB）"""
-    return {"model_id": model_id, "data": [], "message": "数据接口待接入数据库"}
+def get_model_data(
+    model_id: str,
+    trade_date: Optional[str] = Query(None, description="交易日期 YYYY-MM-DD"),
+    fund_code: Optional[str] = Query(None, description="基金代码"),
+    start_date: Optional[str] = Query(None, description="开始日期"),
+    end_date: Optional[str] = Query(None, description="结束日期"),
+):
+    """获取指定模型的数据"""
+    try:
+        from services.model_data_service import get_yield_curve_data, get_nav_history
+
+        if model_id == "yield-curve":
+            return get_yield_curve_data(trade_date=trade_date)
+
+        elif model_id == "nav-history":
+            if not fund_code:
+                raise HTTPException(status_code=400, detail="nav-history 需要 fund_code 参数")
+            return get_nav_history(fund_code=fund_code, start_date=start_date, end_date=end_date)
+
+        else:
+            return {"model_id": model_id, "data": [], "message": "该模型数据接口尚未实现"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # DB 不可用时降级返回空数据，不影响页面加载
+        print(f"[Models API] 数据查询失败: {type(e).__name__}: {e}")
+        return {"model_id": model_id, "data": [], "error": str(e)}

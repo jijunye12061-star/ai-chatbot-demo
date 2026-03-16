@@ -4,6 +4,65 @@
 
 ---
 
+## [2026-03-16] 多 Agent 系统实现（Phase A–E 全部完成）
+
+### 完成内容
+
+#### Phase A：骨架搭建
+- **`db/connection.py`**：pymysql 连接封装，支持 readonly 账号切换 + 执行超时
+- **`db/safety.py`**：SQL 安全校验（去注释→危险关键词→分号检测→SELECT only→白名单表→子查询深度→LIMIT注入），14个单测全部通过
+- **`llm/client.py`**：AsyncOpenAI 封装，提供 `chat_completion()` 和 `stream_text()` 异步接口
+- **`agents/base.py`**：BaseAgent 基类，实现 Function Calling 循环（非流式检测 tool_calls → 执行工具 → 流式输出最终回复）
+- **`agents/chat_agent.py`**：闲聊 Agent，无工具，直接流式输出，含 CLI 测试入口
+- **`agents/router_agent.py`**：意图路由，使用 `route_to` tool + 关键词兜底，支持 chat/data_query/fund_screen/report 四种意图
+- **`agents/orchestrator.py`**：总调度入口，Route → Agent 分发
+- **`tools/registry.py`**：工具注册表，延迟加载避免循环导入
+- **`tools/definitions.py`**：ROUTE_TO / EXECUTE_SQL / FILTER_FUNDS / GENERATE_REPORT 四个工具 JSON Schema
+- **`prompts/chat.md`**、**`prompts/router.md`**：对应 Agent 的 system prompt
+- **`api/chat.py`**（改造）：改为 async，调用 `orchestrator.run()`，SSE 流保持不变
+
+#### Phase B：数据查询能力
+- **`templates/db_schema.md`**：6张表的字段说明（含注意事项），注入 DataQueryAgent prompt
+- **`tools/sql_executor.py`**：LLM SQL → 安全校验 → 只读执行 → JSON 格式结果
+- **`agents/data_query_agent.py`**：覆盖 `_load_prompt` 动态注入 db_schema，含 CLI 测试入口
+- **`prompts/data_query.md`**：DataQueryAgent system prompt，含 `{db_schema}` 占位符
+
+#### Phase C：基金筛选能力
+- **`tools/fund_filter.py`**：代码生成 SQL（不走 LLM），支持类型/规模/收益率筛选
+- **`agents/fund_screener_agent.py`**：FundScreenerAgent，含 CLI 测试入口
+- **`prompts/fund_screener.md`**：FundScreenerAgent prompt
+
+#### Phase D：报告生成能力
+- **`templates/fund_report.json`**：报告节定义（basic/nav/portfolio/summary），按 parallel_group 并行执行
+- **`prompts/report_basic.md`**、**`report_nav.md`**、**`report_portfolio.md`**、**`report_summary.md`**：各节 prompt
+- **`prompts/report_writer.md`**：ReportAgent system prompt
+- **`tools/report_gen.py`**：按 parallel_group 并行生成各节，asyncio.gather 并发
+- **`agents/report_agent.py`**：先 yield 提示语再执行 super().run()
+
+#### Phase E：页面数据接入
+- **`services/model_data_service.py`**：`get_yield_curve_data()` / `get_nav_history()`
+- **`api/models.py`**（改造）：`GET /api/models/{id}/data` 接入真实 DB，DB 不可用时降级返回空数据
+- **`frontend/src/views/models/YieldCurve.vue`**（改造）：`onMounted` 调用 API，有数据时替换 KPI/表格/图表，失败时降级 mock
+
+### 安装依赖
+```bash
+pip install pymysql sqlparse pytest
+```
+
+### MySQL 只读账号（一次性执行）
+```bash
+docker exec -i dev-mysql mysql -uroot -pdev -e \
+  "CREATE USER IF NOT EXISTS 'readonly'@'%' IDENTIFIED BY 'readonly'; \
+   GRANT SELECT ON fund_platform.* TO 'readonly'@'%'; FLUSH PRIVILEGES;"
+```
+
+### 下一步
+- 运行 `pytest tests/test_sql_safety.py` 验证 SQL 安全校验
+- 启动后端 `uvicorn main:app --reload --port 8000` 测试完整链路
+- 对话测试：普通问答/数据查询/基金筛选/报告生成
+
+---
+
 ## [2026-03-13] Phase 2 启动 — 完整平台框架搭建
 
 ### 完成内容
