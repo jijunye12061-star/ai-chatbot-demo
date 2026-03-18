@@ -80,6 +80,25 @@ FILTER_FUNDS_TOOL = {
     },
 }
 
+GET_TABLE_SCHEMA_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_table_schema",
+        "description": "获取指定数据库表的详细结构说明，包括字段清单、枚举值、注意事项和查询示例。在写 SQL 之前必须先调用此工具了解表结构。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "tables": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "需要查看的表名列表，如 ['tb_fd_nav_daily', 'tb_fd_perform_abs']",
+                }
+            },
+            "required": ["tables"],
+        },
+    },
+}
+
 GENERATE_REPORT_TOOL = {
     "type": "function",
     "function": {

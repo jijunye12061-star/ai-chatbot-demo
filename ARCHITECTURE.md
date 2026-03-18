@@ -122,7 +122,7 @@ project/
 | `agents/base.py` | BaseAgent 基类：Function Calling 循环（检测 tool_calls → 执行 → 流式最终回复） |
 | `agents/router_agent.py` | 意图路由：LLM tool_call + 关键词兜底，返回 agent_key |
 | `agents/chat_agent.py` | 兜底闲聊 Agent，无工具 |
-| `agents/data_query_agent.py` | 数据查询 Agent，注入 db_schema，使用 execute_sql 工具 |
+| `agents/data_query_agent.py` | 数据查询 Agent，注入 table_catalog，使用 get_table_schema + execute_sql 工具（两层召回） |
 | `agents/fund_screener_agent.py` | 基金筛选 Agent，使用 filter_funds 工具 |
 | `agents/report_agent.py` | 报告生成 Agent，先提示再调用 generate_fund_report 工具 |
 
@@ -131,8 +131,9 @@ project/
 | 文件 | 职责 |
 |------|------|
 | `tools/registry.py` | 工具注册表，延迟加载避免循环导入 |
-| `tools/definitions.py` | 所有工具的 JSON Schema：route_to / execute_sql / filter_funds / generate_fund_report |
+| `tools/definitions.py` | 所有工具的 JSON Schema：route_to / execute_sql / filter_funds / generate_fund_report / get_table_schema |
 | `tools/sql_executor.py` | LLM SQL → safety.validate_sql → 只读执行 → JSON 结果 |
+| `tools/schema_reader.py` | `get_table_schema(tables)` → 读取 templates/table_specs/*.md → 返回拼接的字段说明 |
 | `tools/fund_filter.py` | 代码生成 SQL 筛选基金（不走 LLM，直接拼 SQL） |
 | `tools/report_gen.py` | 按 fund_report.json 模板，parallel_group 并行生成各节报告 |
 
@@ -142,7 +143,7 @@ project/
 |------|------|
 | `prompts/chat.md` | ChatAgent system prompt |
 | `prompts/router.md` | RouterAgent system prompt，定义4种意图和路由规则 |
-| `prompts/data_query.md` | DataQueryAgent prompt，含 `{db_schema}` 占位符 |
+| `prompts/data_query.md` | DataQueryAgent prompt，含 `{table_catalog}` 和 `{today}` 占位符，两层召回工作流程说明 |
 | `prompts/fund_screener.md` | FundScreenerAgent prompt |
 | `prompts/report_writer.md` | ReportAgent system prompt |
 | `prompts/report_basic.md` | 基础信息节 prompt |
@@ -154,7 +155,9 @@ project/
 
 | 文件 | 用途 |
 |------|------|
-| `templates/db_schema.md` | 6张表字段说明，注入 DataQueryAgent prompt |
+| `templates/db_schema.md` | 旧版全量字段说明（保留不删，已不被 DataQueryAgent 使用） |
+| `templates/table_catalog.md` | 9张表的极简目录（一行一表），始终注入 DataQueryAgent prompt |
+| `templates/table_specs/` | 每张表一个 md 文件，按需通过 get_table_schema 工具加载（含字段清单、枚举值、查询示例） |
 | `templates/fund_report.json` | 报告节定义（id/title/sql/parallel_group/depends_on） |
 
 ### 测试 (`tests/`)

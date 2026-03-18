@@ -6,6 +6,7 @@ from tools.definitions import (
     EXECUTE_SQL_TOOL,
     FILTER_FUNDS_TOOL,
     GENERATE_REPORT_TOOL,
+    GET_TABLE_SCHEMA_TOOL,
 )
 
 TOOL_REGISTRY: dict = {}
@@ -21,6 +22,10 @@ def _lazy_register():
     """延迟注册，避免循环导入"""
     if TOOL_REGISTRY:
         return
+
+    # schema reader
+    from tools.schema_reader import get_table_schema
+    register_tool(GET_TABLE_SCHEMA_TOOL, get_table_schema)
 
     # sql executor
     from tools.sql_executor import execute_sql

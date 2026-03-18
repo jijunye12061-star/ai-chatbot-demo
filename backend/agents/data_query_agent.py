@@ -1,6 +1,6 @@
 """
 DataQueryAgent：数据库查询 Agent
-覆盖 _load_prompt，动态注入 db_schema 内容
+两层召回：始终注入 table_catalog，按需通过 get_table_schema 获取详细字段说明
 """
 import os
 from agents.base import BaseAgent
@@ -13,18 +13,18 @@ class DataQueryAgent(BaseAgent):
         super().__init__(
             name="DataQueryAgent",
             prompt_file="data_query.md",
-            tool_names=["execute_sql"],
+            tool_names=["get_table_schema", "execute_sql"],
         )
 
     def _load_prompt(self, filename: str) -> str:
         from datetime import date
         prompt = super()._load_prompt(filename)
-        # 注入数据库结构说明
-        schema_path = os.path.join(_TEMPLATES_DIR, "db_schema.md")
-        with open(schema_path, "r", encoding="utf-8") as f:
-            db_schema = f.read()
+        # 注入表目录（轻量级，始终注入）
+        catalog_path = os.path.join(_TEMPLATES_DIR, "table_catalog.md")
+        with open(catalog_path, "r", encoding="utf-8") as f:
+            table_catalog = f.read()
         today = date.today().strftime("%Y-%m-%d")
-        return prompt.format(db_schema=db_schema, today=today)
+        return prompt.format(table_catalog=table_catalog, today=today)
 
 
 if __name__ == "__main__":

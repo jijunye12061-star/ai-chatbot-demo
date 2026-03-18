@@ -99,6 +99,9 @@ def test_allow_all_whitelist_tables():
         "tb_fd_asset_allocation",
         "tb_fd_portfolio_bd",
         "tb_fd_portfolio_stk",
+        "tb_fd_perform_abs",
+        "tb_dict_params",
+        "tb_fd_tag_asset_eq",
     ]
     for table in allowed:
         ok, sql = validate_sql(f"SELECT * FROM {table} LIMIT 1")

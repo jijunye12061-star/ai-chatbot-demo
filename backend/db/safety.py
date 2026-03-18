@@ -12,6 +12,9 @@ ALLOWED_TABLES = {
     "tb_fd_asset_allocation",
     "tb_fd_portfolio_bd",
     "tb_fd_portfolio_stk",
+    "tb_fd_perform_abs",
+    "tb_dict_params",
+    "tb_fd_tag_asset_eq",
 }
 
 MAX_ROWS = 1000

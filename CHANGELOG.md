@@ -4,6 +4,37 @@
 
 ---
 
+## [2026-03-18] DataQueryAgent "Schema as Skill" 改造
+
+### 完成内容
+
+#### 两层召回架构
+- **`templates/table_catalog.md`**（新增）：9 张表的极简目录，始终注入 DataQueryAgent prompt，帮助 LLM 快速判断需要哪些表
+- **`templates/table_specs/`**（新增，9 个文件）：每张表一个 md，包含实际导出列的字段清单、枚举值、注意事项、查询示例
+- **`tools/schema_reader.py`**（新增）：`get_table_schema(tables)` 函数，读取 table_specs/ 下的 md 文件并拼接返回
+- **`tools/definitions.py`**（修改）：新增 `GET_TABLE_SCHEMA_TOOL` JSON Schema
+- **`tools/registry.py`**（修改）：注册 `get_table_schema` 工具
+- **`prompts/data_query.md`**（重写）：两层召回逻辑，`{table_catalog}` + `{today}` 占位符，明确 nav_daily（小数格式）vs perform_abs（已是%）的数据格式差异
+- **`agents/data_query_agent.py`**（改造）：注入 table_catalog 替代全量 db_schema，tool_names 增加 `get_table_schema`
+
+#### 白名单扩展
+- **`db/safety.py`**（修改）：ALLOWED_TABLES 新增 `tb_fd_perform_abs`、`tb_dict_params`、`tb_fd_tag_asset_eq`
+- **`tests/test_sql_safety.py`**（修改）：同步更新白名单测试列表，14 个 case 全部通过
+
+#### 文档更新
+- **`docs/local_dev_db.md`**：表列表从 6 张更新为 9 张，补充预估行数
+- `ARCHITECTURE.md` + `CHANGELOG.md` 同步更新
+
+### 验证结果
+- `pytest tests/test_sql_safety.py` — 14 passed
+- CLI 测试 1-9：LLM 正确先调用 `get_table_schema` 再写 SQL，选表准确，字段正确
+
+### 下一步
+- Phase 2 更多模型展示页面
+- Phase 3 AI Function Calling 推荐模型
+
+---
+
 ## [2026-03-16] 多 Agent 系统实现（Phase A–E 全部完成）
 
 ### 完成内容

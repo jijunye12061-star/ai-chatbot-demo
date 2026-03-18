@@ -38,16 +38,19 @@ docker exec -it dev-mysql mysql -uroot -pdev fund_platform
 
 ## 数据库表结构
 
-共 6 张表，全部基于生产 Doris 的表/视图结构转换而来。视图在本地统一转为普通表，字段名保持一致。
+共 9 张表，全部基于生产 Doris 的表/视图结构转换而来。视图在本地统一转为普通表，字段名保持一致。
 
-| 表名                     | 说明     | 主键                                   | 对应 Doris 来源  |
-|------------------------|--------|--------------------------------------|--------------|
-| tb_fd_basic_info       | 基金基础信息 | c_fd_code                            | TABLE        |
-| tb_fd_category         | 基金分类   | c_report_date, c_fd_code             | TABLE        |
-| tb_fd_nav_daily        | 每日净值   | c_trade_date, c_fd_code              | VIEW → TABLE |
-| tb_fd_asset_allocation | 资产配置   | c_fd_code, c_report_date             | VIEW → TABLE |
-| tb_fd_portfolio_bd     | 债券持仓明细 | c_fd_code, c_report_date, c_bd_code  | VIEW → TABLE |
-| tb_fd_portfolio_stk    | 股票持仓明细 | c_fd_code, c_report_date, c_stk_code | VIEW → TABLE |
+| 表名                     | 说明           | 主键                                        | 预估行数     |
+|------------------------|--------------|---------------------------------------------|----------|
+| tb_fd_basic_info       | 基金基础信息       | c_fd_code                                   | ~500     |
+| tb_fd_category         | 基金组内分类（自研）   | c_report_date, c_fd_code                    | ~1,200   |
+| tb_fd_nav_daily        | 每日净值         | c_trade_date, c_fd_code                     | ~144,000 |
+| tb_fd_asset_allocation | 资产配置（季报）     | c_fd_code, c_report_date, c_style           | ~1,600   |
+| tb_fd_portfolio_bd     | 债券持仓明细（季报）   | c_fd_code, c_report_date, c_bd_code, c_style | ~21,000  |
+| tb_fd_portfolio_stk    | 股票持仓明细（季报）   | c_fd_code, c_report_date, c_stk_code, c_style | ~22,000 |
+| tb_fd_perform_abs      | 绝对收益指标（按区间）  | c_fd_code, c_trade_date, c_period_code      | ~82,000  |
+| tb_dict_params         | 通用参数字典（行业分类） | c_param_type, c_param_code                  | ~3,100   |
+| tb_fd_tag_asset_eq     | 权益基金资产配置标签   | c_fd_code, c_report_date                    | ~330     |
 
 ### 建表脚本
 
@@ -105,11 +108,17 @@ IGNORE 1 ROWS;
 
 ### 当前数据量
 
-| 表名               | 行数     |
-|------------------|--------|
-| tb_fd_basic_info | 200    |
-| tb_fd_nav_daily  | 30,544 |
-| 其他表              | 待导入    |
+| 表名 | 行数 |
+|------|------|
+| tb_fd_basic_info | ~500 |
+| tb_fd_category | ~1,200 |
+| tb_fd_nav_daily | ~144,000 |
+| tb_fd_asset_allocation | ~1,600 |
+| tb_fd_portfolio_stk | ~22,000 |
+| tb_fd_portfolio_bd | ~21,000 |
+| tb_fd_perform_abs | ~82,000 |
+| tb_dict_params | ~3,100 |
+| tb_fd_tag_asset_eq | ~330 |
 
 > 导入时的 warnings 为空字符串与 NULL 的转换问题，不影响查询测试。
 
