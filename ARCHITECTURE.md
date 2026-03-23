@@ -160,6 +160,8 @@ project/
 | `templates/screen_catalog.md`                     | 基金筛选模板目录摘要，始终注入 FundScreenerAgent prompt               |
 | `templates/screen_templates/`                     | 筛选模板 YAML 文件（每个模板含 id/params/sql/type）                 |
 | `templates/screen_templates/001_return_rank.yaml` | 模板001：按指定区间收益率排名筛选基金                                   |
+| `templates/table_specs/tb_stk_industry.md`        | 新增：A股行业归属表规格，dev 适配版（2 个截面）                            |
+| `templates/table_specs/tb_stk_concept.md`         | 新增：A股概念归属表规格，dev 适配版（2 个截面）                            |
 
 ### 工具函数 (`utils/`)
 
@@ -180,7 +182,9 @@ project/
 
 | 文件                      | 职责                              |
 |-------------------------|---------------------------------|
-| `data/schema_mysql.sql` | 建表脚本（9 张表），用于初始化本地 Docker MySQL |
+| `data/schema_mysql.sql` | 建表脚本（11 张表），用于初始化本地 Docker MySQL |
+| `data/import.py` | CSV 批量导入脚本：读 11 个 CSV → 类型转换 → INSERT（pandas + mysql-connector） |
+| `data/test_chat.py` | 后端 AI 问答测试脚本：直接 POST /api/chat，流式打印，无需前端 |
 
 详细说明见 `docs/local_dev_db.md`：容器名 `dev-mysql`、端口 3306、库名 `fund_platform`、root/dev。
 
