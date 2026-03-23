@@ -34,12 +34,15 @@ async def run(message: str, history: list) -> AsyncGenerator[str, None]:
     """
     messages = list(history) + [{"role": "user", "content": message}]
 
-    # 1. 路由
-    intent = await _router.classify(messages)
+    try:
+        intent = await _router.classify(messages)
+    except Exception as e:
+        print(f"[Orchestrator] 路由失败: {e}，降级到 chat")
+        intent = "chat"
+    # _agents.get 提供第二层保护：即使 intent 不合法也回退到 chat
     agent = _agents.get(intent, _agents["chat"])
     print(f"[Orchestrator] 分发到: {agent.name}")
 
-    # 2. 执行并 yield chunks
     async for chunk in agent.run(messages):
         yield chunk
 

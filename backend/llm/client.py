@@ -2,11 +2,16 @@
 LLM 调用封装层，所有 Agent 共用。
 使用 AsyncOpenAI 支持异步流式输出。
 """
-import json
+import httpx
 from openai import AsyncOpenAI
 from config import API_KEY, BASE_URL, MODEL, MAX_TOKENS
 
-client = AsyncOpenAI(api_key=API_KEY, base_url=BASE_URL)
+client = AsyncOpenAI(
+    api_key=API_KEY,
+    base_url=BASE_URL,
+    timeout=httpx.Timeout(connect=10, read=120, write=10, pool=10),
+    max_retries=2,
+)
 
 
 async def chat_completion(messages: list, tools: list = None, stream: bool = False, **kwargs):

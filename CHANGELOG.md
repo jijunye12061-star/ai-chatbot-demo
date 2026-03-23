@@ -4,6 +4,60 @@
 
 ---
 
+## [2026-03-23] 文档结构重组
+
+### 完成内容
+- **`docs/README.md`**（新增）：文档导航首页，所有文档一览
+- **`docs/requirements/`**（新增目录）：原大需求文档拆分为 4 个独立文件
+  - `01-overview.md`：项目背景、技术栈、三期路线图
+  - `02-model-display.md`：模型展示系统需求
+  - `03-ai-agent.md`：AI 问答 + 多 Agent 架构设计
+  - `04-api-contract.md`：前后端 API 契约
+- **`docs/dev/local-db.md`**（新增）：从 `docs/local_dev_db.md` 迁移，同步更新新增表清单（`safety.py` 白名单已自动化）
+- **归档**：`local_dev_db.md`、`backend_review.md`、`基金研究团队模型展示平台需求文档.md` 移入 `docs/archive/`
+- **`CLAUDE.md`**：更新文档路径引用，修正 Key Architecture Notes 中的过期描述
+- **`ARCHITECTURE.md`**：同步更新 docs 目录说明
+
+---
+
+## [2026-03-23] 后端代码质量优化（backend_review.md 全项修复）
+
+### 完成内容
+
+#### P0 安全修复
+- **`backend/config.py`**：API Key 改为读取 `LLM_API_KEY` 环境变量，启动时未设置直接报错
+- **`.env.example`**（新增）：环境变量模板，`.env` 已在 `.gitignore` 中
+
+#### P0 逻辑修复
+- **`backend/agents/base.py`**：FC 循环达到上限（10次）时不再静默结束，yield 兜底提示语
+
+#### P1 性能优化
+- **`backend/agents/base.py`**：无工具 Agent（ChatAgent）添加快速路径，直接流式输出，省去一次非流式 LLM 调用
+- **`backend/llm/client.py`**：AsyncOpenAI 添加 `httpx.Timeout`（connect=10s, read=120s）和 `max_retries=2`，防止请求挂死
+
+#### P1 健壮性
+- **`backend/agents/orchestrator.py`**：路由 `_router.classify()` 失败时降级到 `chat`，防止请求炸掉
+
+#### P1 代码清理
+- **`backend/agents/base.py`**：`_execute_tool` 中废弃的 `asyncio.get_event_loop()` 替换为 `asyncio.to_thread()`
+- **`backend/utils/serializers.py`**（新增）：提取公共 JSON 序列化函数 `json_default`，处理 Decimal/datetime
+- **`backend/tools/fund_filter.py`**、**`backend/tools/sql_executor.py`**：改为 `from utils.serializers import json_default`，移除重复定义
+
+#### P2 代码质量
+- **`backend/llm/client.py`**：移除未使用的 `import json`
+- **`backend/agents/router_agent.py`**：`today` 从启动时固定改为每次 `classify()` 调用时注入，长时间运行不会过期
+- **`backend/api/chat.py`**：`Message.role` 从 `str` 改为 `Role` 枚举（`user`/`assistant`），防止前端传入非法 role
+- **`backend/db/safety.py`**：`ALLOWED_TABLES` 从 `table_specs/` 目录自动读取文件名，新增表无需手动同步白名单
+
+### 验证
+- `pytest tests/test_sql_safety.py` — **14 passed**（含白名单自动生成后的校验）
+- `pytest tests/test_screen_template.py` — **7 passed / 5 skipped**（5个需要 Docker MySQL，已知 DB 未启动）
+
+### 下一步
+- Phase 2：更多模型 Dashboard 页面
+
+---
+
 ## [2026-03-18] 项目文件审计与清理
 
 ### 完成内容

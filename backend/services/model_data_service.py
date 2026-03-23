@@ -3,22 +3,8 @@
 注意：收益率曲线数据来自 tb_fd_nav_daily，使用基金代码模拟曲线，
       如有专门的国债收益率表则替换对应 SQL 即可。
 """
-import decimal
-import datetime
 from db.connection import execute_query
-
-
-def _serialize_row(row: dict) -> dict:
-    """转换 Decimal 和 date 类型为 Python 原生类型"""
-    result = {}
-    for k, v in row.items():
-        if isinstance(v, decimal.Decimal):
-            result[k] = float(v)
-        elif isinstance(v, (datetime.date, datetime.datetime)):
-            result[k] = str(v)
-        else:
-            result[k] = v
-    return result
+from utils.serializers import serialize_row
 
 
 def get_yield_curve_data(trade_date: str = None) -> dict:
@@ -59,7 +45,7 @@ def get_yield_curve_data(trade_date: str = None) -> dict:
         LIMIT 20
     """
     rows = execute_query(sql, params=(trade_date,), readonly=False)
-    rows = [_serialize_row(r) for r in rows]
+    rows = [serialize_row(r) for r in rows]
 
     return {
         "trade_date": trade_date,
@@ -91,7 +77,7 @@ def get_nav_history(fund_code: str, start_date: str = None, end_date: str = None
     """
 
     rows = execute_query(sql, params=tuple(params), readonly=False)
-    rows = [_serialize_row(r) for r in rows]
+    rows = [serialize_row(r) for r in rows]
 
     return {
         "fund_code": fund_code,

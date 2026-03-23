@@ -4,11 +4,11 @@
 import os
 import json
 import yaml
-import decimal
 import datetime
 from functools import lru_cache
 from db.connection import execute_query
 from db.safety import validate_sql
+from utils.serializers import json_default
 
 _TEMPLATES_DIR = os.path.join(
     os.path.dirname(__file__), "..", "templates", "screen_templates"
@@ -121,15 +121,6 @@ def _build_and_execute_sql(template: dict, params: dict) -> list:
     return execute_query(sql, params=tuple(sql_params), readonly=True)
 
 
-def _default_serializer(obj):
-    """JSON 序列化辅助"""
-    if isinstance(obj, decimal.Decimal):
-        return float(obj)
-    if isinstance(obj, (datetime.date, datetime.datetime)):
-        return str(obj)
-    return str(obj)
-
-
 def run_screen_template(template_id: str, params: dict = None) -> str:
     """
     执行基金筛选模板。
@@ -175,5 +166,5 @@ def run_screen_template(template_id: str, params: dict = None) -> str:
     if not rows:
         return f"模板 '{template['name']}' 未找到符合条件的基金，建议调整参数。"
 
-    result_str = json.dumps(rows, ensure_ascii=False, default=_default_serializer, indent=2)
+    result_str = json.dumps(rows, ensure_ascii=False, default=json_default, indent=2)
     return f"使用模板「{template['name']}」筛选到 {len(rows)} 支基金：\n{result_str}"

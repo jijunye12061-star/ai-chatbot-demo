@@ -4,6 +4,7 @@ RouterAgent：意图识别，返回 agent_key
 """
 import json
 import os
+from datetime import date
 
 from llm.client import chat_completion
 from tools.definitions import ROUTE_TO_TOOL
@@ -22,19 +23,22 @@ VALID_KEYS = {"chat", "fund_screen", "data_query", "report"}
 
 class RouterAgent:
     def __init__(self):
-        from datetime import date
         prompt_path = os.path.join(_PROMPTS_DIR, "router.md")
         with open(prompt_path, "r", encoding="utf-8") as f:
-            template = f.read()
-        today = date.today().strftime("%Y-%m-%d")
-        self.system_prompt = template.replace("{today}", today)
+            self._template = f.read()
+        self._cached_date: str = ""
+        self._cached_prompt: str = ""
 
     async def classify(self, messages: list) -> str:
         """
         分析消息列表，返回 agent_key。
         优先级：LLM tool_call > 文本解析 > 关键词匹配 > 默认 chat
         """
-        full_messages = [{"role": "system", "content": self.system_prompt}] + list(messages)
+        today = date.today().strftime("%Y-%m-%d")
+        if today != self._cached_date:
+            self._cached_date = today
+            self._cached_prompt = self._template.replace("{today}", today)
+        full_messages = [{"role": "system", "content": self._cached_prompt}] + list(messages)
 
         try:
             response = await chat_completion(

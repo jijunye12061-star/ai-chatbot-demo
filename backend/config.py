@@ -1,7 +1,9 @@
 import os
 
 # LLM 配置
-API_KEY = "VOplCUjdbDBjO1Zf4f2eE5CcBd244835Ad31D5F6Ab7699F9"
+API_KEY = os.getenv("LLM_API_KEY", "")
+if not API_KEY:
+    raise ValueError("环境变量 LLM_API_KEY 未设置，请在 .env 文件或启动命令中配置")
 BASE_URL = "https://dd-ai-api.eastmoney.com/v1"
 MODEL = "DeepSeek-V3"
 MAX_TOKENS = 2000

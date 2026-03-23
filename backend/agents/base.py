@@ -23,6 +23,7 @@ class BaseAgent:
         self.name = name
         self.system_prompt = self._load_prompt(prompt_file)
         self.tool_names = tool_names or []
+        self._tool_schemas = get_tool_schemas(self.tool_names) if self.tool_names else []
 
     def _load_prompt(self, filename: str) -> str:
         path = os.path.join(_PROMPTS_DIR, filename)
@@ -35,22 +36,25 @@ class BaseAgent:
         messages 格式：[{"role": "user"/"assistant", "content": "..."}]
         """
         full_messages = [{"role": "system", "content": self.system_prompt}] + list(messages)
-        tool_schemas = get_tool_schemas(self.tool_names) if self.tool_names else None
+
+        # 快速路径：无工具 Agent 直接流式输出，省去一次非流式调用
+        if not self.tool_names:
+            async for chunk in stream_text(full_messages):
+                yield chunk
+            return
 
         max_iterations = 10
         for _ in range(max_iterations):
-            # 非流式调用，用于检测 tool_calls
             response = await chat_completion(
                 full_messages,
-                tools=tool_schemas or None,
+                tools=self._tool_schemas,
                 stream=False,
             )
             choice = response.choices[0]
 
             if choice.finish_reason == "tool_calls" and choice.message.tool_calls:
-                # 执行工具
                 tool_calls = choice.message.tool_calls
-                # 先把 assistant 消息加入历史
+                # OpenAI 要求 assistant 消息先入列，tool 结果再追加，顺序不可颠倒
                 full_messages.append(choice.message)
 
                 for tc in tool_calls:
@@ -62,14 +66,16 @@ class BaseAgent:
                         "tool_call_id": tc.id,
                         "content": str(result),
                     })
-                continue  # 继续 FC 循环
+                continue
 
             else:
-                # 最终文本回复 — 流式输出
-                # 如果上一轮有 tool 调用，full_messages 已包含工具结果，需要再次请求
                 async for chunk in stream_text(full_messages):
                     yield chunk
                 break
+        else:
+            # FC 循环跑满未 break — 兜底提示，防止空回复
+            print(f"[{self.name}] ⚠️ FC 循环达到上限 {max_iterations}")
+            yield "抱歉，处理过程过于复杂，请尝试简化问题。"
 
     async def _execute_tool(self, tool_name: str, arguments: str) -> str:
         try:
@@ -85,8 +91,7 @@ class BaseAgent:
             if inspect.iscoroutinefunction(func):
                 result = await func(**args)
             else:
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(None, lambda: func(**args))
+                result = await asyncio.to_thread(func, **args)
             return result
         except Exception as e:
             return f"[工具执行错误] {tool_name}: {type(e).__name__}: {e}"

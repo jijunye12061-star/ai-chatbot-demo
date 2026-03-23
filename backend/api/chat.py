@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -8,8 +9,13 @@ from agents.orchestrator import run as agent_run
 router = APIRouter()
 
 
+class Role(str, Enum):
+    user = "user"
+    assistant = "assistant"
+
+
 class Message(BaseModel):
-    role: str
+    role: Role
     content: str
 
 

@@ -161,6 +161,12 @@ project/
 | `templates/screen_templates/`                     | 筛选模板 YAML 文件（每个模板含 id/params/sql/type）                 |
 | `templates/screen_templates/001_return_rank.yaml` | 模板001：按指定区间收益率排名筛选基金                                   |
 
+### 工具函数 (`utils/`)
+
+| 文件                        | 职责                                              |
+|---------------------------|-------------------------------------------------|
+| `utils/serializers.py`    | 公共 JSON 序列化辅助：处理 Decimal / datetime 类型，供工具层共用 |
+
 ### 测试 (`tests/`)
 
 | 文件                              | 用途                                                 |
@@ -180,13 +186,16 @@ project/
 
 ## 文档 (`docs/`)
 
-| 文件/目录                              | 用途                                           |
-|------------------------------------|----------------------------------------------|
-| `docs/local_dev_db.md`             | 本地开发数据库完整说明：容器信息、建表、数据导入/导出、新增表操作清单          |
-| `docs/基金研究团队模型展示平台需求文档.md`         | 完整产品需求文档                                     |
-| `docs/table_specs_source/`         | 各表的规格定义源文件（含 16 张表，含 7 张未实现的股票/债券表），是扩表的前置参考 |
-| `docs/archive/`                    | 已归档的历史规划文档（仅存档，不参与开发）                        |
-| `docs/archive/MULTI_AGENT_PLAN.md` | 多 Agent 架构规划（已落地，存档）                         |
+| 文件/目录                                      | 用途                                           |
+|--------------------------------------------|----------------------------------------------|
+| `docs/README.md`                           | 文档导航首页，所有文档的入口索引                             |
+| `docs/requirements/01-overview.md`         | 项目背景、技术栈、三期路线图                               |
+| `docs/requirements/02-model-display.md`    | 模型展示系统设计需求                                   |
+| `docs/requirements/03-ai-agent.md`         | AI 问答 + 多 Agent 架构设计                         |
+| `docs/requirements/04-api-contract.md`     | 前后端 API 契约（请求/响应格式、SSE 协议）                   |
+| `docs/dev/local-db.md`                     | 本地开发数据库说明：容器信息、建表、数据导入/导出、新增表操作清单            |
+| `docs/table_specs_source/`                 | 各表的规格定义源文件（含 16 张表，含 7 张未实现的股票/债券表），是扩表的前置参考 |
+| `docs/archive/`                            | 已归档的历史文档（仅存档，不参与开发）                          |
 
 ---
 

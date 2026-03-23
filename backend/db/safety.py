@@ -2,20 +2,19 @@
 SQL 安全校验模块（硬性防护）
 校验顺序：去注释 → 单语句 → SELECT only → 白名单表 → 子查询深度 → LIMIT 注入
 """
+import glob
+import os
 import re
 import sqlparse
 
+# 白名单表名从 table_specs/*.md 自动生成，新增表只需添加对应 .md 文件
+_SPECS_DIR = os.path.join(os.path.dirname(__file__), "..", "templates", "table_specs")
 ALLOWED_TABLES = {
-    "tb_fd_basic_info",
-    "tb_fd_category",
-    "tb_fd_nav_daily",
-    "tb_fd_asset_allocation",
-    "tb_fd_portfolio_bd",
-    "tb_fd_portfolio_stk",
-    "tb_fd_perform_abs",
-    "tb_dict_params",
-    "tb_fd_tag_asset_eq",
+    os.path.splitext(os.path.basename(f))[0]
+    for f in glob.glob(os.path.join(_SPECS_DIR, "*.md"))
 }
+if not ALLOWED_TABLES:
+    raise RuntimeError(f"未找到表规范文件，请检查目录是否存在：{_SPECS_DIR}")
 
 MAX_ROWS = 1000
 

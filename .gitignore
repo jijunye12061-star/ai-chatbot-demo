@@ -32,3 +32,6 @@ Thumbs.db
 *.local.json
 .env
 .env.local
+
+# docs
+docs/table_specs_source
