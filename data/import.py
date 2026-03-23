@@ -148,14 +148,24 @@ def import_table(conn, cfg: dict, data_dir: str):
     print(f"  导入 {table} ...", end=" ", flush=True)
 
     df = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
+    # 过滤掉无效列名（CSV trailing comma 会产生空列名或字符串 'nan' / 'Unnamed: N'）
+    valid_cols = [c for c in df.columns
+                  if isinstance(c, str) and c and c != 'nan'
+                  and not c.startswith('Unnamed:')]
+    df = df[valid_cols]
     df = clean_df(df, cfg)
 
     cols = list(df.columns)
     placeholders = ", ".join(["%s"] * len(cols))
     col_names = ", ".join(cols)
-    sql = f"INSERT INTO {table} ({col_names}) VALUES ({placeholders})"
+    sql = f"INSERT IGNORE INTO {table} ({col_names}) VALUES ({placeholders})"
 
-    rows = [tuple(row) for row in df.itertuples(index=False, name=None)]
+    # float NaN → None（mysql-connector executemany 会把 float NaN 格式化成裸 nan，被 MySQL 误认为列名）
+    import math
+    rows = [
+        tuple(None if (isinstance(v, float) and math.isnan(v)) else v for v in row)
+        for row in df.itertuples(index=False, name=None)
+    ]
 
     cursor = conn.cursor()
     batch = 500
