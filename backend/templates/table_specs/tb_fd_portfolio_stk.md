@@ -13,12 +13,16 @@
 | c_hold_share | DECIMAL(18,0) | 持仓股数（单位：股） |
 | c_hold_value | DECIMAL(18,4) | 持仓市值（**单位：元**，展示时÷1e8转亿） |
 | c_nav_ratio | DECIMAL(18,4) | 占净值比例（**单位：%**，5.32表示5.32%） |
+| c_invest_type | VARCHAR(10) | 投资类型（3=主动管理等） |
+| c_notice_date | DATE | 公告日期 |
+| c_inner_code | BIGINT | 股票内部代码 |
+| c_is_stat | TINYINT | 是否统计（-1=已统计） |
 
 ## 注意事项
 
 - **c_hold_value 单位是元**，展示时除以 1e8 转换为亿元
 - **c_nav_ratio 单位是 %**，5.32 直接表示 5.32%
-- 本地数据时间范围：c_report_date >= '2025-06-30'
+- 本地数据时间范围：c_report_date 有 3 个截面：2025-06-30 / 2025-09-30 / 2025-12-31
 - 查询前十大重仓股：ORDER BY c_nav_ratio DESC LIMIT 10
 - CSV 导入后空值为空字符串
 
@@ -31,6 +35,8 @@
 | 02 | 中报/半年报 |
 | 03 | 三季报（Q3） |
 | 04 | 年报 |
+| 05 | 二季报（Q2，6月30日补充） |
+| 06 | 四季报（Q4，12月31日） |
 
 ## 常用查询示例
 

@@ -12,6 +12,7 @@
 | c_period_ret | DECIMAL(10,4) | 区间收益率（**已是%，25.5=25.5%**） |
 | c_ann_ret | DECIMAL(10,4) | 年化收益率（**已是%**） |
 | c_ann_vol | DECIMAL(10,4) | 年化波动率（**已是%**，正数） |
+| c_up_side_vol | DECIMAL(18,4) | 上行波动率（**已是%**，正数） |
 | c_down_side_vol | DECIMAL(10,4) | 下行波动率（**已是%**，正数） |
 | c_mdd | DECIMAL(10,4) | 最大回撤（**已是%，正数**，25.5=回撤25.5%） |
 | c_sharpe | DECIMAL(15,4) | 夏普比率（纯数值，无单位） |
@@ -19,6 +20,8 @@
 | c_sortino | DECIMAL(15,4) | 索提诺比率（纯数值，无单位） |
 | c_skewness | DECIMAL(10,4) | 偏度（正值=右偏，负值=左偏） |
 | c_kurtosis | DECIMAL(10,4) | 峰度（>3尖峰，<3平坦） |
+| c_break_ratio | DECIMAL(18,4) | 盈利天数比例（%，大于0的净值增长日占比） |
+| c_updatetime | DATETIME(3) | 更新时间 |
 
 ## 注意事项
 
@@ -29,6 +32,8 @@
 - 数据不足时（如成立不满1年查1年指标）字段为 NULL 或空字符串
 - 本地数据 c_trade_date 在 2025-12-01 ~ 2025-12-31 之间
 - 查询最新指标：ORDER BY c_trade_date DESC LIMIT N
+- c_up_side_vol 和 c_down_side_vol 分别衡量上行/下行波动，均为正数、已是 %
+- c_break_ratio = 60.0 表示 60% 的交易日净值为正增长
 
 ## 枚举值
 
