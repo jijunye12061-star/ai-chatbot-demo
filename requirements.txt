@@ -4,3 +4,6 @@ openai
 pymysql
 sqlparse
 cryptography
+pydantic
+pytest
+pyyaml

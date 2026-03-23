@@ -151,6 +151,20 @@ DB_CONFIG = {
 
 本地开发默认 `dev`，生产部署时设 `APP_ENV=prod`。
 
+## 新增表操作清单
+
+每次新增一张表时，按以下顺序同步更新各处：
+
+```
+□ docs/table_specs_source/tb_xxx/   新建 schema.sql + insert.py + SPEC.md
+□ backend/templates/table_catalog.md    加一行（极简目录）
+□ backend/templates/table_specs/tb_xxx.md   新建详细字段说明
+□ backend/tools/schema_reader.py    VALID_TABLES 加表名
+□ backend/db/safety.py              ALLOWED_TABLES 加表名
+□ backend/tests/test_sql_safety.py  test_allow_all_whitelist_tables 更新
+□ 本地 MySQL 导入数据（docker cp + LOAD DATA）
+```
+
 ## 注意事项
 
 - Doris 视图在本地是普通表，需要手动维护数据同步（定期重新导出导入）

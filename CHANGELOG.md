@@ -4,6 +4,71 @@
 
 ---
 
+## [2026-03-18] 项目文件审计与清理
+
+### 完成内容
+
+#### 删除废弃文件（8个）
+- `backend/services/llm_service.py` — 无引用，已被 `llm/client.py` 取代
+- `backend/services/db_service.py` — 无引用，已被 `model_data_service.py` 取代
+- `backend/templates/db_schema.md` — 已被两层召回架构取代，DataQueryAgent 不再使用
+- `FUND_SCREENER_TEMPLATE_PLAN.md` — 规划已落地
+- `TASK_schema_as_skill.md` — 规划已落地
+- `data/tb_fd_portfolio_stk.csv` — 已导入 DB，CSV 不再需要
+- `import_to_docker.ps1` — 一次性初始化脚本，已完成使命
+- `scripts/export_data.py` + `scripts/` 目录
+
+#### 文档整理
+- `docs/MULTI_AGENT_PLAN.md` → 移入 `docs/archive/`（新建归档目录）
+- `docs/NEW_TABLE_CHECKLIST.md` → 内容并入 `docs/local_dev_db.md`（新增"新增表操作清单"章节），原文件删除
+- `docs/local_dev_db.md`：补充新增表操作清单，内容更完整
+
+#### ARCHITECTURE.md 同步更新
+- 移除已删文件条目（services/llm_service.py、db_service.py、db_schema.md）
+- 新增 `docs/` 目录说明章节
+- 修复数据流图（model_data_service 替代旧 db_service 引用）
+- 修复重复条目、建表脚本表数（6→9）
+
+---
+
+## [2026-03-18] FundScreenerAgent "SQL 模板填参"架构改造
+
+### 完成内容
+
+#### 模板基础设施（Step 1）
+- **`templates/screen_templates/001_return_rank.yaml`**（新增）：第一个筛选模板，按指定区间收益率排名，支持 period_code 枚举、fund_category 可选过滤、trade_date 自动取最新
+- **`templates/screen_catalog.md`**（新增）：模板目录摘要，始终注入 FundScreenerAgent prompt
+- **`tools/screen_functions/__init__.py`**（新增）：python_func 类型模板的函数存放目录骨架
+
+#### 工具层改造（Step 2）
+- **`tools/fund_filter.py`**（重写）：从硬编码 SQL 拼接 → 模板加载 + 参数校验 + SQL 渲染 + 执行；`run_screen_template(template_id, params)` 替代原 `filter_funds()`；内置 safety.validate_sql 防御层
+- **`tools/definitions.py`**（修改）：删除 `FILTER_FUNDS_TOOL`，新增 `RUN_SCREEN_TEMPLATE_TOOL`
+- **`tools/registry.py`**（修改）：替换工具注册（filter_funds → run_screen_template）
+
+#### Agent 层改造（Step 3）
+- **`prompts/fund_screener.md`**（重写）：模板选择工作流，含 `{screen_catalog}` 和 `{today}` 占位符
+- **`agents/fund_screener_agent.py`**（改造）：参考 DataQueryAgent 模式，覆盖 `_load_prompt` 注入 screen_catalog + today
+- **`prompts/router.md`**（修改）：更新 fund_screen 路由描述，补充"排名""前N""TOP"特征词和3条路由示例
+
+#### 测试（Step 4）
+- **`tests/test_screen_template.py`**（新增）：12个 case，覆盖模板加载/参数校验/枚举映射/必填检查/日期格式/limit上限/默认值/catalog文件/prompt占位符
+
+### 验证结果
+- `pytest tests/test_screen_template.py -v` — **12 passed**
+- `pytest tests/test_sql_safety.py -v` — **14 passed**（已有测试无破坏）
+
+### 架构要点
+- 模板 SQL 使用 pymysql 参数化（`%s`），防止 SQL 注入
+- 可选条件（category_filter）通过字符串替换插入 SQL 片段，非 LLM 生成
+- 模板 type 支持 `sql` 和 `python_func`，后者通过动态 import 调用 `tools/screen_functions/` 下的函数
+- 新增模板只需：① 在 `screen_templates/` 下新建 yaml ② 在 `screen_catalog.md` 追加一行
+
+### 下一步
+- CLI 集成测试（需 Docker MySQL + LLM）：`python -m agents.fund_screener_agent "筛选近3月收益率前20的基金"`
+- 扩充更多筛选模板（如板块持仓占比筛选）
+
+---
+
 ## [2026-03-18] DataQueryAgent "Schema as Skill" 改造
 
 ### 完成内容

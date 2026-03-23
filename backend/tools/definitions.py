@@ -47,35 +47,24 @@ EXECUTE_SQL_TOOL = {
     },
 }
 
-FILTER_FUNDS_TOOL = {
+RUN_SCREEN_TEMPLATE_TOOL = {
     "type": "function",
     "function": {
-        "name": "filter_funds",
-        "description": "按条件筛选基金，支持按类型、规模、收益率等条件过滤",
+        "name": "run_screen_template",
+        "description": "执行基金筛选模板。根据 prompt 中的模板目录选择合适的模板 ID，传入所需参数执行筛选。",
         "parameters": {
             "type": "object",
             "properties": {
-                "fund_type": {
+                "template_id": {
                     "type": "string",
-                    "description": "基金类型关键词，例如：股票、债券、混合、货币、指数",
+                    "description": "模板 ID，如 '001'。必须从模板目录中选择。",
                 },
-                "min_size_billion": {
-                    "type": "number",
-                    "description": "最小规模（亿元），例如 10 表示规模不低于 10 亿元",
-                },
-                "max_size_billion": {
-                    "type": "number",
-                    "description": "最大规模（亿元）",
-                },
-                "min_return_1y_pct": {
-                    "type": "number",
-                    "description": "最低近一年收益率（百分比），例如 10 表示近一年收益率不低于 10%",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "返回结果数量上限，默认 20",
+                "params": {
+                    "type": "object",
+                    "description": "模板所需参数，键值对。参数名和取值参考模板目录中的参数说明。",
                 },
             },
+            "required": ["template_id", "params"],
         },
     },
 }

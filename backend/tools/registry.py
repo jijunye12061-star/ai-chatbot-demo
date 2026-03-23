@@ -4,7 +4,7 @@
 from tools.definitions import (
     ROUTE_TO_TOOL,
     EXECUTE_SQL_TOOL,
-    FILTER_FUNDS_TOOL,
+    RUN_SCREEN_TEMPLATE_TOOL,
     GENERATE_REPORT_TOOL,
     GET_TABLE_SCHEMA_TOOL,
 )
@@ -31,9 +31,9 @@ def _lazy_register():
     from tools.sql_executor import execute_sql
     register_tool(EXECUTE_SQL_TOOL, execute_sql)
 
-    # fund filter
-    from tools.fund_filter import filter_funds
-    register_tool(FILTER_FUNDS_TOOL, filter_funds)
+    # fund screener (template-based)
+    from tools.fund_filter import run_screen_template
+    register_tool(RUN_SCREEN_TEMPLATE_TOOL, run_screen_template)
 
     # report generator
     from tools.report_gen import generate_fund_report

@@ -1,106 +1,179 @@
 """
-基金筛选工具：按条件拼 SQL 直查 DB（代码生成 SQL，不走 LLM，不走 safety.py）
+基金筛选工具：模板加载 + 参数校验 + SQL 渲染 + 执行
 """
+import os
 import json
+import yaml
 import decimal
 import datetime
+from functools import lru_cache
 from db.connection import execute_query
+from db.safety import validate_sql
+
+_TEMPLATES_DIR = os.path.join(
+    os.path.dirname(__file__), "..", "templates", "screen_templates"
+)
 
 
-def filter_funds(
-    fund_type: str = None,
-    min_size_billion: float = None,
-    max_size_billion: float = None,
-    min_return_1y_pct: float = None,
-    limit: int = 20,
-) -> str:
+@lru_cache(maxsize=64)
+def _load_template(template_id: str) -> dict:
+    """加载 YAML 模板文件"""
+    for fname in os.listdir(_TEMPLATES_DIR):
+        if fname.startswith(template_id) and fname.endswith(".yaml"):
+            path = os.path.join(_TEMPLATES_DIR, fname)
+            with open(path, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f)
+    raise ValueError(f"模板 {template_id} 不存在")
+
+
+def _resolve_trade_date(value: str, table: str = "tb_fd_perform_abs") -> str:
     """
-    按条件筛选基金。
-    - fund_type: 基金类型关键词（模糊匹配 c_class1_name/c_class2_name）
-    - min_size_billion: 规模下限（亿元）
-    - max_size_billion: 规模上限（亿元）
-    - min_return_1y_pct: 近一年收益率下限（%），内部转换为小数
+    处理 trade_date 参数：
+    - 'latest' → 查询表中最新日期
+    - 具体日期字符串 → 直接返回
     """
-    limit = min(limit or 20, 100)
-
-    # 构建 JOIN 查询
-    conditions = ["b.c_fd_code = n.c_fd_code"]
-    params = []
-
-    # 基金类型过滤（匹配分类名称）
-    if fund_type:
-        conditions.append(
-            "(b.c_class1_name LIKE %s OR b.c_class2_name LIKE %s OR b.c_class3_name LIKE %s)"
+    if value == "latest":
+        rows = execute_query(
+            f"SELECT MAX(c_trade_date) AS max_date FROM {table}",
+            readonly=True,
         )
-        like_val = f"%{fund_type}%"
-        params.extend([like_val, like_val, like_val])
+        if rows and rows[0]["max_date"]:
+            d = rows[0]["max_date"]
+            return d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
+        raise ValueError(f"无法获取 {table} 的最新日期")
+    return value
 
-    # 规模过滤（需要关联资产配置表获取最新规模）
-    size_join = ""
-    if min_size_billion is not None or max_size_billion is not None:
-        size_join = """
-        LEFT JOIN (
-            SELECT c_fd_code, c_fund_nav_total,
-                   ROW_NUMBER() OVER (PARTITION BY c_fd_code ORDER BY c_report_date DESC) AS rn
-            FROM tb_fd_asset_allocation
-        ) a ON b.c_fd_code = a.c_fd_code AND a.rn = 1
-        """
-        if min_size_billion is not None:
-            # 亿元转换为元（×1e8）
-            conditions.append("a.c_fund_nav_total >= %s")
-            params.append(min_size_billion * 1e8)
-        if max_size_billion is not None:
-            conditions.append("a.c_fund_nav_total <= %s")
-            params.append(max_size_billion * 1e8)
 
-    # 收益率过滤（使用最新一条净值记录）
-    if min_return_1y_pct is not None:
-        conditions.append("n.c_ret_1y >= %s")
-        params.append(min_return_1y_pct / 100.0)  # % 转小数
-
-    where_clause = " AND ".join(conditions)
-
-    sql = f"""
-        SELECT
-            b.c_fd_code,
-            b.c_short_name,
-            b.c_class1_name,
-            b.c_class2_name,
-            b.c_manager_name,
-            b.c_company_name,
-            n.c_nav,
-            n.c_ret_1y,
-            n.c_ret_ytd,
-            n.c_trade_date
-        FROM tb_fd_basic_info b
-        JOIN (
-            SELECT c_fd_code, c_nav, c_ret_1y, c_ret_ytd, c_trade_date,
-                   ROW_NUMBER() OVER (PARTITION BY c_fd_code ORDER BY c_trade_date DESC) AS rn
-            FROM tb_fd_nav_daily
-        ) n ON b.c_fd_code = n.c_fd_code AND n.rn = 1
-        {size_join}
-        WHERE {where_clause}
-        ORDER BY n.c_ret_1y DESC
-        LIMIT {limit}
+def _validate_params(param_defs: dict, user_params: dict) -> dict:
     """
+    校验参数：类型检查、枚举映射、默认值填充。
+    返回校验后的参数字典。
+    """
+    validated = {}
+    for name, spec in param_defs.items():
+        value = user_params.get(name)
 
-    print(f"[FundFilter] 筛选条件: type={fund_type}, min_size={min_size_billion}亿, "
-          f"max_size={max_size_billion}亿, min_ret1y={min_return_1y_pct}%")
+        # 必填检查
+        if value is None:
+            if spec.get("required", False) is True and "default" not in spec:
+                raise ValueError(f"缺少必填参数: {name} ({spec.get('description', '')})")
+            value = spec.get("default")
+
+        if value is None:
+            continue
+
+        # 类型处理
+        param_type = spec.get("type", "string")
+
+        if param_type == "enum":
+            options = spec.get("options", {})
+            # 支持传枚举名称或直接传代码
+            if value in options:
+                value = options[value]  # 名称 → 代码
+            elif value not in options.values():
+                valid = list(options.keys())
+                raise ValueError(f"参数 {name} 的值 '{value}' 无效，可选: {valid}")
+
+        elif param_type == "date":
+            # 处理 latest 特殊值
+            if value == "latest":
+                value = _resolve_trade_date("latest")
+            # 简单格式校验
+            elif isinstance(value, str):
+                try:
+                    datetime.datetime.strptime(value, "%Y-%m-%d")
+                except ValueError:
+                    raise ValueError(f"参数 {name} 日期格式错误，应为 YYYY-MM-DD")
+
+        elif param_type == "int":
+            value = int(value)
+            if "max" in spec:
+                value = min(value, spec["max"])
+
+        validated[name] = value
+    return validated
+
+
+def _build_and_execute_sql(template: dict, params: dict) -> list:
+    """
+    根据模板和参数构建参数化 SQL 并执行。
+    """
+    sql_template = template["sql"]
+    sql_params = []
+
+    sql_params.append(params["trade_date"])
+    sql_params.append(params["period_code"])
+
+    category_filter = ""
+    if params.get("fund_category"):
+        category_filter = "AND cat.c_type1_name LIKE %s"
+        sql_params.append(f"%{params['fund_category']}%")
+
+    sql_params.append(params.get("limit", 50))
+
+    sql = sql_template.replace("{category_filter}", category_filter)
+
+    # safety 校验（防御层，虽然是人工写的模板，防止意外篡改）
+    ok, result = validate_sql(sql)
+    if not ok:
+        raise ValueError(f"SQL 安全校验失败: {result}")
+
+    return execute_query(sql, params=tuple(sql_params), readonly=True)
+
+
+def _default_serializer(obj):
+    """JSON 序列化辅助"""
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return str(obj)
+    return str(obj)
+
+
+def run_screen_template(template_id: str, params: dict = None) -> str:
+    """
+    执行基金筛选模板。
+    - template_id: 模板 ID（如 "001"）
+    - params: 参数字典
+    返回 JSON 格式结果字符串。
+    """
+    params = params or {}
 
     try:
-        rows = execute_query(sql, params=tuple(params), readonly=True)
-    except Exception as e:
-        return f"筛选查询失败：{type(e).__name__}: {e}"
+        template = _load_template(template_id)
+    except ValueError as e:
+        return f"[错误] {e}"
+
+    print(f"[FundScreener] 使用模板: {template['name']} (id={template_id}), 参数: {params}")
+
+    # 参数校验
+    try:
+        validated = _validate_params(template["params"], params)
+    except ValueError as e:
+        return f"[参数错误] {e}"
+
+    # 根据类型执行
+    if template["type"] == "sql":
+        try:
+            rows = _build_and_execute_sql(template, validated)
+        except Exception as e:
+            return f"[查询失败] {type(e).__name__}: {e}"
+
+    elif template["type"] == "python_func":
+        try:
+            func_path = template["func"]  # 如 "screen_functions.sector_holding.fd_bk_pct"
+            module_path, func_name = func_path.rsplit(".", 1)
+            import importlib
+            module = importlib.import_module(f"tools.{module_path}")
+            func = getattr(module, func_name)
+            rows = func(**validated)
+        except Exception as e:
+            return f"[执行失败] {type(e).__name__}: {e}"
+    else:
+        return f"[错误] 不支持的模板类型: {template['type']}"
 
     if not rows:
-        return "未找到符合条件的基金，建议放宽筛选条件。"
+        return f"模板 '{template['name']}' 未找到符合条件的基金，建议调整参数。"
 
-    def default_serializer(obj):
-        if isinstance(obj, decimal.Decimal):
-            return float(obj)
-        if isinstance(obj, (datetime.date, datetime.datetime)):
-            return str(obj)
-        return str(obj)
-
-    result_str = json.dumps(rows, ensure_ascii=False, default=default_serializer, indent=2)
-    return f"筛选到 {len(rows)} 支基金：\n{result_str}"
+    result_str = json.dumps(rows, ensure_ascii=False, default=_default_serializer, indent=2)
+    return f"使用模板「{template['name']}」筛选到 {len(rows)} 支基金：\n{result_str}"

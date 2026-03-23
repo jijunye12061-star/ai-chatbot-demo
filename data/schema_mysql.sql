@@ -97,7 +97,6 @@ CREATE TABLE tb_fd_portfolio_stk (
     c_report_date DATE           COMMENT '报告日期',
     c_style       VARCHAR(20)    COMMENT '报表类型',
     c_stk_code    VARCHAR(20)    COMMENT '股票代码',
-    c_stk_name    VARCHAR(100)   COMMENT '股票名称',
     c_hold_share  DECIMAL(20,4)  COMMENT '持仓股数(股)',
     c_hold_value  DECIMAL(20,4)  COMMENT '持仓市值(元)',
     c_nav_ratio   DECIMAL(18,6)  COMMENT '占净值比例',

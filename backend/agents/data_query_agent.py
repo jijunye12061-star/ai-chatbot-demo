@@ -3,6 +3,7 @@ DataQueryAgent：数据库查询 Agent
 两层召回：始终注入 table_catalog，按需通过 get_table_schema 获取详细字段说明
 """
 import os
+from datetime import date
 from agents.base import BaseAgent
 
 _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
@@ -17,7 +18,6 @@ class DataQueryAgent(BaseAgent):
         )
 
     def _load_prompt(self, filename: str) -> str:
-        from datetime import date
         prompt = super()._load_prompt(filename)
         # 注入表目录（轻量级，始终注入）
         catalog_path = os.path.join(_TEMPLATES_DIR, "table_catalog.md")
