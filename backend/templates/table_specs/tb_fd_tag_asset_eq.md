@@ -12,12 +12,13 @@
 | c_stk_pos_chg_avg | DECIMAL(8,4) | 股票仓位变动均值（近八期均值，**单位：%**） |
 | c_stk_pos_level | VARCHAR(20) | 仓位等级（见枚举） |
 | c_stk_timing | VARCHAR(10) | 择时标签（见枚举） |
+| c_updatetime | DATETIME(3) | 更新时间 |
 
 ## 注意事项
 
 - **仅覆盖权益基金**（对应 tb_fd_category 中 c_type1_code = '001' 的基金）
 - c_stk_pos_avg 和 c_stk_pos_chg_avg **单位是 %**，85.5 表示 85.5%
-- 本地数据：c_report_date >= '2025-06-30'（最近 2 个季度）
+- 本地数据时间范围：c_report_date 有 3 个截面：2025-06-30 / 2025-09-30 / 2025-12-31
 - CSV 导入后空值为空字符串
 
 ## 枚举值

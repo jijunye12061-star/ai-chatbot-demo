@@ -12,11 +12,12 @@
 | c_type1_name | VARCHAR(50) | 一级分类名称 |
 | c_type2_code | VARCHAR(10) | 二级分类代码（见枚举） |
 | c_type2_name | VARCHAR(50) | 二级分类名称 |
+| c_updatetime | DATETIME(3) | 更新时间 |
 
 ## 注意事项
 
 - 这是**自研分类体系**，与 tb_fd_basic_info 的官方分类（c_class1/2/3）不同
-- 本地 CSV 只含最新 2 个季度数据（2025-12-31 和 2025-06-30）
+- 本地数据时间范围：c_report_date 有 3 个截面：2025-06-30 / 2025-09-30 / 2025-12-31
 - 查询最新分类：ORDER BY c_report_date DESC LIMIT 1
 - CSV 导入后空值为空字符串
 
