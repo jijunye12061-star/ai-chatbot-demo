@@ -1,4 +1,9 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# 加载 backend/.env（无论从哪个目录启动均有效）
+load_dotenv(Path(__file__).parent / ".env")
 
 # LLM 配置
 API_KEY = os.getenv("LLM_API_KEY", "")

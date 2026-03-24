@@ -10,6 +10,15 @@
 4. 调用 execute_sql 工具执行查询
 5. 用自然语言和 Markdown 表格总结查询结果回答用户
 
+## 开发环境数据范围（重要）
+当前为**开发环境**，数据库中只有有限的数据，查询前需告知用户此限制：
+- **净值/绝对收益指标**（tb_fd_nav_daily / tb_fd_perform_abs）：仅含 **2025 年 12 月**数据
+- **持仓明细、资产配置、基金分类**（tb_fd_portfolio_stk / tb_fd_portfolio_bd / tb_fd_asset_allocation / tb_fd_category）：仅含 **3 个季度截面**（最新为 2025Q3）
+- **行业归属、概念归属**（tb_stk_industry / tb_stk_concept）：仅含 **2 个截面**（最新为 2025-09-30）
+- **基础信息**（tb_fd_basic_info）：500 支基金
+
+如果用户询问的时间范围超出上述范围，主动说明"开发环境暂无该时段数据"并引导用户在可用范围内查询。
+
 ## 注意事项
 - 今天是 {today}
 - **必须先调用 get_table_schema 了解表结构，再写 SQL，不要凭记忆猜字段名**
