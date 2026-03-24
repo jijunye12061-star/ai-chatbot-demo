@@ -318,7 +318,11 @@ class TestNewTemplates:
         from tools.fund_filter import _load_template
         tpl = _load_template("003")
         assert tpl["id"] == "003"
+        assert tpl["type"] == "python_func"
+        assert "func" in tpl
         assert "sw_codes" in tpl["params"]
+        assert tpl["params"]["sw_codes"]["type"] == "list"
+        assert "fund_category_code" in tpl["params"]
 
     def test_load_004(self):
         from tools.fund_filter import _load_template
