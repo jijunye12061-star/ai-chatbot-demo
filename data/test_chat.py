@@ -1,21 +1,28 @@
 """
-后端 AI 问答测试脚本
-用法：
-  1. 启动后端：cd backend && uvicorn main:app --reload --port 8000
-  2. 另开终端：python data/test_chat.py
-  3. 指定问题：python data/test_chat.py "华夏成长近1年夏普比率是多少？"
-  4. 指定端口：python data/test_chat.py --port 8001 "..."
-  5. 运行某类用例：python data/test_chat.py --group fund_screen
+后端 AI 问答直连测试脚本（无需启动后端服务）
 
-依赖：pip install httpx
+用法：
+  python data/test_chat.py                              # 交互模式（手动输入问题）
+  python data/test_chat.py "华夏成长近1年夏普比率是多少？"  # 单条提问
+  python data/test_chat.py --group fund_screen          # 运行某类预置用例
+  python data/test_chat.py --all                        # 跑全部预置用例（逐条确认）
+
+直接调用 orchestrator.run()，日志（[Router]/[Agent]/[Tool] 等）实时输出在终端。
 """
 import sys
-import json
-import httpx
+import asyncio
+import os
 
-DEFAULT_PORT = 8002
+# 将 backend/ 加入模块搜索路径
+_BACKEND_DIR = os.path.join(os.path.dirname(__file__), "..", "backend")
+sys.path.insert(0, os.path.abspath(_BACKEND_DIR))
 
-# 按路由分组的测试用例
+# 导入 config 触发 .env 加载（LLM_API_KEY 等）
+import config  # noqa: E402, F401
+
+
+# ── 测试用例 ──────────────────────────────────────────────────────────────────
+
 TEST_GROUPS = {
     "chat": [
         "你好，介绍一下你能做什么",
@@ -27,24 +34,19 @@ TEST_GROUPS = {
         "帮我查下权益类基金有哪些？列出基金名和代码",
     ],
     "fund_screen": [
-        # 模板001：收益率排名
-        "筛选近1年收益率排名前10的主动权益基金",
-        "近3月表现最好的债券基金是哪些？",
         # 模板002：概念主题曝露度
         "筛选持有新能源汽车概念股较多的权益基金",
         "哪些基金重仓了人工智能概念股？",
         # 模板003：申万行业曝露度
         "筛选重仓电子行业的权益基金",
-        "哪些权益基金对医药生物行业曝露较高？",
-        # 模板004：多条件业绩
+        # 模板004：跨区间多条件业绩筛选
         "筛选近1年年化收益率大于10%且最大回撤小于15%的权益基金",
-        "近3月收益率超过5%、夏普比率大于1的基金有哪些？",
+        "近3月最大回撤小于10%，同时近1年年化收益大于20%的权益基金有哪些？",
         # 模板005：权益标签
         "有哪些高仓位的权益基金？",
     ],
 }
 
-# 默认运行全部用例
 ALL_CASES = (
     TEST_GROUPS["chat"]
     + TEST_GROUPS["data_query"]
@@ -52,81 +54,86 @@ ALL_CASES = (
 )
 
 
-def chat(message: str, history: list = None, port: int = DEFAULT_PORT) -> str:
-    """发送一条消息，流式接收并打印，返回完整回复"""
+# ── 核心调用 ──────────────────────────────────────────────────────────────────
+
+async def chat(message: str, history: list = None) -> str:
+    """直接调用 orchestrator，流式打印输出，返回完整回复文本。"""
+    from agents.orchestrator import run
+
     if history is None:
         history = []
 
-    api_url = f"http://localhost:{port}/api/chat"
     print(f"\n{'='*60}")
     print(f"问：{message}")
     print(f"{'='*60}")
     print("答：", end="", flush=True)
 
     full_response = ""
-    try:
-        with httpx.stream(
-            "POST", api_url,
-            json={"message": message, "history": history},
-            timeout=120.0,
-        ) as response:
-            response.raise_for_status()
-            for line in response.iter_lines():
-                if not line.startswith("data: "):
-                    continue
-                data = json.loads(line[6:])
-                content = data.get("content", "")
-                if content:
-                    print(content, end="", flush=True)
-                    full_response += content
-                if data.get("done"):
-                    break
-    except httpx.ConnectError:
-        print(f"\n[错误] 无法连接后端，请确认 uvicorn 已在 {port} 端口启动")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n[错误] {e}")
+    async for chunk in run(message, history):
+        print(chunk, end="", flush=True)
+        full_response += chunk
 
     print()
     return full_response
 
 
+# ── 入口 ─────────────────────────────────────────────────────────────────────
+
 def main():
     args = sys.argv[1:]
-    port = DEFAULT_PORT
     group = None
+    run_all = False
+    question_parts = []
 
-    # 解析参数
     i = 0
-    remaining = []
     while i < len(args):
-        if args[i] == "--port" and i + 1 < len(args):
-            port = int(args[i + 1])
-            i += 2
-        elif args[i] == "--group" and i + 1 < len(args):
+        if args[i] == "--group" and i + 1 < len(args):
             group = args[i + 1]
             i += 2
+        elif args[i] == "--all":
+            run_all = True
+            i += 1
         else:
-            remaining.append(args[i])
+            question_parts.append(args[i])
             i += 1
 
-    if remaining:
-        # 命令行传入问题
-        chat(" ".join(remaining), port=port)
+    if question_parts:
+        # 命令行直接传问题
+        asyncio.run(chat(" ".join(question_parts)))
+
     elif group:
-        # 运行某类用例
+        # 跑指定分组
         cases = TEST_GROUPS.get(group)
         if not cases:
             print(f"[错误] 未知 group: {group}，可选: {list(TEST_GROUPS.keys())}")
             sys.exit(1)
-        for question in cases:
-            chat(question, port=port)
+        for q in cases:
+            asyncio.run(chat(q))
             input("\n按 Enter 继续下一个问题...")
+
+    elif run_all:
+        # 跑全部预置用例
+        for q in ALL_CASES:
+            asyncio.run(chat(q))
+            input("\n按 Enter 继续下一个问题...")
+
     else:
-        # 跑全部预置测试用例
-        for question in ALL_CASES:
-            chat(question, port=port)
-            input("\n按 Enter 继续下一个问题...")
+        # 交互模式
+        print("直连测试模式（Ctrl+C 退出）")
+        print(f"可选分组：{list(TEST_GROUPS.keys())}")
+        history = []
+        while True:
+            try:
+                user_input = input("\n你：").strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\n退出")
+                break
+            if not user_input:
+                continue
+            reply = asyncio.run(chat(user_input, history))
+            # 维护多轮对话上下文
+            history.append({"role": "user", "content": user_input})
+            history.append({"role": "assistant", "content": reply})
 
 
 if __name__ == "__main__":

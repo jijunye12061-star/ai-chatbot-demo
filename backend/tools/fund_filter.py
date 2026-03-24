@@ -102,6 +102,15 @@ def _validate_params(param_defs: dict, user_params: dict) -> dict:
             if "max" in spec:
                 value = min(value, spec["max"])
 
+        elif param_type == "float":
+            value = float(value)
+
+        elif param_type == "list":
+            if not isinstance(value, list):
+                raise ValueError(f"参数 {name} 应为列表类型")
+            if not value:
+                raise ValueError(f"参数 {name} 不能为空列表")
+
         elif param_type == "conditions":
             # {field: {min: value_or_null, max: value_or_null}}
             if not isinstance(value, dict):

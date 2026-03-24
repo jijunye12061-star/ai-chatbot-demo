@@ -3,6 +3,11 @@
 **当前阶段**：Phase 2 — 模型展示页面（进行中）
 
 ## 最近完成
+- [2026-03-24] 模板 002 重构为 python_func，修复去重 bug，36个测试全部通过，端到端测试通过
+  - 002 type 改为 python_func，新建 tools/screen_functions/concept_exposure.py
+  - 修复去重 bug：PARTITION BY (c_fd_code, c_report_date, c_stk_code) 正确保留所有股票
+  - 解决 MySQL LIMIT-in-subquery 限制：Python 侧先取日期再传参
+  - test_load_002 断言更新为 python_func；test_catalog 改用正则匹配模板行
 - [2026-03-24] 模板 004 改造为跨区间筛选（python_func），删除模板 001，36个测试全部通过
   - 004 type 改为 python_func，动态生成多 JOIN SQL 支持跨区间条件
   - 新建 tools/screen_functions/performance_filter.py（cross_period_filter 函数）

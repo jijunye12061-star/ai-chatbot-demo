@@ -308,8 +308,11 @@ class TestNewTemplates:
         from tools.fund_filter import _load_template
         tpl = _load_template("002")
         assert tpl["id"] == "002"
-        assert tpl["type"] == "sql"
+        assert tpl["type"] == "python_func"
+        assert "func" in tpl
         assert "concept_codes" in tpl["params"]
+        assert tpl["params"]["concept_codes"]["type"] == "list"
+        assert "fund_category_code" in tpl["params"]
 
     def test_load_003(self):
         from tools.fund_filter import _load_template
@@ -335,15 +338,19 @@ class TestNewTemplates:
         assert tpl["params"]["tag_conditions"]["type"] == "dict"
 
     def test_catalog_mentions_all_templates(self):
-        """screen_catalog.md 应包含 002-007 所有模板（001 已删除）"""
+        """screen_catalog.md 应包含 002-007 所有模板行（001 行已删除）"""
+        import re
         catalog_path = os.path.join(
             os.path.dirname(__file__), "..", "templates", "screen_catalog.md"
         )
         with open(catalog_path, "r", encoding="utf-8") as f:
             content = f.read()
+        # 模板行格式：| 00X | ...
         for tid in ["002", "003", "004", "005", "006", "007"]:
-            assert tid in content, f"screen_catalog.md 缺少模板 {tid}"
-        assert "001" not in content, "screen_catalog.md 不应再包含已删除的模板 001"
+            assert re.search(rf"^\|\s*{tid}\s*\|", content, re.MULTILINE), \
+                f"screen_catalog.md 缺少模板 {tid} 行"
+        assert not re.search(r"^\|\s*001\s*\|", content, re.MULTILINE), \
+            "screen_catalog.md 不应再有模板 001 行"
 
 
 class TestRenderSqlParamOrder:
