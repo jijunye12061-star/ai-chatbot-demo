@@ -20,6 +20,12 @@ ALLOWED_CONDITION_FIELDS = {
     "c_calmar", "c_sortino", "c_ann_vol", "c_break_ratio"
 }
 
+PERIOD_MAP = {
+    "近1月": "00", "近3月": "01", "近6月": "02",
+    "近1年": "03", "近2年": "04", "近3年": "05",
+    "近5年": "06", "年初至今": "07", "成立以来": "08",
+}
+
 
 @lru_cache(maxsize=64)
 def _load_template(template_id: str) -> dict:
@@ -111,6 +117,29 @@ def _validate_params(param_defs: dict, user_params: dict) -> dict:
                     "max": float(bounds["max"]) if bounds.get("max") is not None else None,
                 }
             value = validated_conditions
+
+        elif param_type == "cross_period_conditions":
+            # {区间名称: {字段: {min, max}}}
+            if not isinstance(value, dict):
+                raise ValueError(f"参数 {name} 应为字典类型")
+            validated_cross = {}
+            for period_name, field_conditions in value.items():
+                if period_name not in PERIOD_MAP:
+                    raise ValueError(f"区间名称 '{period_name}' 无效，可选: {list(PERIOD_MAP.keys())}")
+                if not isinstance(field_conditions, dict):
+                    raise ValueError(f"区间 '{period_name}' 的条件应为字典类型")
+                validated_fields = {}
+                for field, bounds in field_conditions.items():
+                    if field not in ALLOWED_CONDITION_FIELDS:
+                        raise ValueError(f"条件字段 '{field}' 不在白名单中，允许字段: {sorted(ALLOWED_CONDITION_FIELDS)}")
+                    if not isinstance(bounds, dict):
+                        raise ValueError(f"字段 '{field}' 的值应为 {{min: ..., max: ...}} 格式")
+                    validated_fields[field] = {
+                        "min": float(bounds["min"]) if bounds.get("min") is not None else None,
+                        "max": float(bounds["max"]) if bounds.get("max") is not None else None,
+                    }
+                validated_cross[period_name] = validated_fields
+            value = validated_cross
 
         elif param_type == "dict":
             # {field: enum_value} - 标签字段等值匹配

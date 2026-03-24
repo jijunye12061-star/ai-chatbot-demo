@@ -13,13 +13,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 class TestTemplateLoading:
     """测试模板加载"""
 
-    def test_load_001(self):
+    def test_load_004(self):
         from tools.fund_filter import _load_template
-        tpl = _load_template("001")
-        assert tpl["id"] == "001"
-        assert tpl["type"] == "sql"
+        tpl = _load_template("004")
+        assert tpl["id"] == "004"
+        assert tpl["type"] == "python_func"
+        assert "func" in tpl
         assert "params" in tpl
-        assert "sql" in tpl
+        assert "conditions" in tpl["params"]
 
     def test_load_nonexistent(self):
         from tools.fund_filter import _load_template
@@ -28,15 +29,36 @@ class TestTemplateLoading:
 
 
 class TestParamValidation:
-    """测试参数校验"""
+    """测试参数校验（使用内联 param_defs，不依赖具体模板文件）"""
 
     def setup_method(self):
-        from tools.fund_filter import _load_template
-        self.tpl = _load_template("001")
+        # 内联 param_defs，模拟含 enum/date/int 的常见参数组合
+        self.param_defs = {
+            "period_code": {
+                "type": "enum",
+                "required": True,
+                "options": {
+                    "近1月": "00", "近3月": "01", "近6月": "02",
+                    "近1年": "03", "近2年": "04", "近3年": "05",
+                    "近5年": "06", "年初至今": "07", "成立以来": "08",
+                },
+            },
+            "trade_date": {
+                "type": "date",
+                "required": False,
+                "default": "latest",
+            },
+            "limit": {
+                "type": "int",
+                "required": False,
+                "default": 50,
+                "max": 200,
+            },
+        }
 
     def test_valid_params(self):
         from tools.fund_filter import _validate_params
-        result = _validate_params(self.tpl["params"], {
+        result = _validate_params(self.param_defs, {
             "trade_date": "2026-03-14",
             "period_code": "近3月",
             "limit": 30,
@@ -47,7 +69,7 @@ class TestParamValidation:
     def test_enum_by_code(self):
         """直接传代码也应该通过"""
         from tools.fund_filter import _validate_params
-        result = _validate_params(self.tpl["params"], {
+        result = _validate_params(self.param_defs, {
             "period_code": "01",
         })
         assert result["period_code"] == "01"
@@ -55,21 +77,21 @@ class TestParamValidation:
     def test_invalid_enum(self):
         from tools.fund_filter import _validate_params
         with pytest.raises(ValueError, match="无效"):
-            _validate_params(self.tpl["params"], {
+            _validate_params(self.param_defs, {
                 "period_code": "近100年",
             })
 
     def test_missing_required(self):
         from tools.fund_filter import _validate_params
         with pytest.raises(ValueError, match="必填"):
-            _validate_params(self.tpl["params"], {
+            _validate_params(self.param_defs, {
                 # period_code 是必填的，故意不传
             })
 
     def test_invalid_date_format(self):
         from tools.fund_filter import _validate_params
         with pytest.raises(ValueError, match="日期格式"):
-            _validate_params(self.tpl["params"], {
+            _validate_params(self.param_defs, {
                 "trade_date": "2026/03/14",  # 错误格式
                 "period_code": "近1月",
             })
@@ -77,7 +99,7 @@ class TestParamValidation:
     def test_limit_cap(self):
         """limit 不能超过 max"""
         from tools.fund_filter import _validate_params
-        result = _validate_params(self.tpl["params"], {
+        result = _validate_params(self.param_defs, {
             "period_code": "近1月",
             "limit": 999,
         })
@@ -86,7 +108,7 @@ class TestParamValidation:
     def test_default_values(self):
         """不传可选参数时应填充默认值"""
         from tools.fund_filter import _validate_params
-        result = _validate_params(self.tpl["params"], {
+        result = _validate_params(self.param_defs, {
             "period_code": "近1年",
         })
         assert result.get("limit") == 50  # default
@@ -101,14 +123,6 @@ class TestScreenCatalog:
             os.path.dirname(__file__), "..", "templates", "screen_catalog.md"
         )
         assert os.path.exists(catalog_path), "screen_catalog.md 不存在"
-
-    def test_catalog_mentions_001(self):
-        catalog_path = os.path.join(
-            os.path.dirname(__file__), "..", "templates", "screen_catalog.md"
-        )
-        with open(catalog_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        assert "001" in content
 
 
 class TestPromptInjection:
@@ -307,7 +321,11 @@ class TestNewTemplates:
         from tools.fund_filter import _load_template
         tpl = _load_template("004")
         assert tpl["id"] == "004"
+        assert tpl["type"] == "python_func"
+        assert "func" in tpl
         assert "conditions" in tpl["params"]
+        assert tpl["params"]["conditions"]["type"] == "cross_period_conditions"
+        assert "fund_category_code" in tpl["params"]
 
     def test_load_005(self):
         from tools.fund_filter import _load_template
@@ -317,14 +335,15 @@ class TestNewTemplates:
         assert tpl["params"]["tag_conditions"]["type"] == "dict"
 
     def test_catalog_mentions_all_templates(self):
-        """screen_catalog.md 应包含 001-007 所有模板"""
+        """screen_catalog.md 应包含 002-007 所有模板（001 已删除）"""
         catalog_path = os.path.join(
             os.path.dirname(__file__), "..", "templates", "screen_catalog.md"
         )
         with open(catalog_path, "r", encoding="utf-8") as f:
             content = f.read()
-        for tid in ["001", "002", "003", "004", "005", "006", "007"]:
+        for tid in ["002", "003", "004", "005", "006", "007"]:
             assert tid in content, f"screen_catalog.md 缺少模板 {tid}"
+        assert "001" not in content, "screen_catalog.md 不应再包含已删除的模板 001"
 
 
 class TestRenderSqlParamOrder:
@@ -375,3 +394,71 @@ class TestRenderSqlParamOrder:
         assert params[2] == 10.0, f"第3个参数应是 ann_ret min，实际: {params[2]}"
         assert params[3] == 20.0, f"第4个参数应是 mdd max，实际: {params[3]}"
         assert params[4] == 20, f"第5个参数应是 limit，实际: {params[4]}"
+
+
+class TestCrossPeriodConditions:
+    """测试 cross_period_conditions 参数类型校验"""
+
+    def setup_method(self):
+        self.param_defs = {
+            "conditions": {
+                "type": "cross_period_conditions",
+                "required": True,
+            }
+        }
+
+    def test_valid_single_period(self):
+        """单区间 cross_period_conditions 格式"""
+        from tools.fund_filter import _validate_params
+        result = _validate_params(self.param_defs, {
+            "conditions": {"近1年": {"c_ann_ret": {"min": 10, "max": None}}}
+        })
+        assert "近1年" in result["conditions"]
+        assert result["conditions"]["近1年"]["c_ann_ret"]["min"] == 10.0
+
+    def test_valid_cross_period(self):
+        """跨区间 conditions 合法输入"""
+        from tools.fund_filter import _validate_params
+        result = _validate_params(self.param_defs, {
+            "conditions": {
+                "近3月": {"c_mdd": {"max": 10}},
+                "近1年": {"c_ann_ret": {"min": 20}},
+            }
+        })
+        assert "近3月" in result["conditions"]
+        assert "近1年" in result["conditions"]
+        assert result["conditions"]["近3月"]["c_mdd"]["max"] == 10.0
+        assert result["conditions"]["近1年"]["c_ann_ret"]["min"] == 20.0
+
+    def test_invalid_period_name(self):
+        """非法区间名称应抛出 ValueError"""
+        from tools.fund_filter import _validate_params
+        with pytest.raises(ValueError, match="区间名称"):
+            _validate_params(self.param_defs, {
+                "conditions": {"近100年": {"c_ann_ret": {"min": 10}}}
+            })
+
+    def test_invalid_field_in_cross_period(self):
+        """条件字段不在白名单应抛出 ValueError"""
+        from tools.fund_filter import _validate_params
+        with pytest.raises(ValueError, match="白名单"):
+            _validate_params(self.param_defs, {
+                "conditions": {"近1年": {"secret_field": {"min": 0}}}
+            })
+
+    def test_invalid_structure_not_dict(self):
+        """conditions 不是字典应抛出 ValueError"""
+        from tools.fund_filter import _validate_params
+        with pytest.raises(ValueError, match="字典"):
+            _validate_params(self.param_defs, {
+                "conditions": "近1年收益>10%"
+            })
+
+    def test_min_max_converted_to_float(self):
+        """min/max 整数值应被转为 float"""
+        from tools.fund_filter import _validate_params
+        result = _validate_params(self.param_defs, {
+            "conditions": {"近3年": {"c_sharpe": {"min": 1, "max": 3}}}
+        })
+        assert isinstance(result["conditions"]["近3年"]["c_sharpe"]["min"], float)
+        assert isinstance(result["conditions"]["近3年"]["c_sharpe"]["max"], float)

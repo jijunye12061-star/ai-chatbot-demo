@@ -135,7 +135,8 @@ project/
 | `tools/fund_filter.py`      | 模板加载 + 参数校验 + `_render_sql`（具名占位符 {:x}/{*x}/{?x}/{@x}/{#sw_industry}）+ 执行（`run_screen_template`）        |
 | `tools/dimension_lookup.py` | `get_dimension_list(dim_type)` → 查 tb_dict_params → 返回概念/行业码 JSON                                        |
 | `tools/data_agent_bridge.py`| `async ask_data_agent(question)` → 实例化 DataQueryAgent，async for 收集流式输出后返回                              |
-| `tools/screen_functions/`   | Python 函数筛选模块（type=python_func 模板用），当前仅骨架                                                                |
+| `tools/screen_functions/`   | Python 函数筛选模块（type=python_func 模板用）                                                                       |
+| `tools/screen_functions/performance_filter.py` | 模板004 执行函数：`cross_period_filter`，动态生成跨区间多 JOIN SQL      |
 | `tools/report_gen.py`       | 按 fund_report.json 模板，parallel_group 并行生成各节报告                                                            |
 
 ### Prompt 文件 (`prompts/`)
@@ -161,10 +162,9 @@ project/
 | `templates/fund_report.json`                      | 报告节定义（id/title/sql/parallel_group/depends_on）          |
 | `templates/screen_catalog.md`                     | 基金筛选模板目录摘要，始终注入 FundScreenerAgent prompt               |
 | `templates/screen_templates/`                     | 筛选模板 YAML 文件（每个模板含 id/params/sql/type）                 |
-| `templates/screen_templates/001_return_rank.yaml`     | 模板001：按指定区间收益率排名筛选基金（具名占位符格式）                            |
 | `templates/screen_templates/002_concept_exposure.yaml`| 模板002：概念主题曝露度筛选（{*concept_codes}，四层CTE）                   |
 | `templates/screen_templates/003_industry_exposure.yaml`| 模板003：申万行业曝露度筛选（{#sw_industry}，支持一/二/三级混合）             |
-| `templates/screen_templates/004_performance_filter.yaml`| 模板004：单期多条件业绩筛选（{@conditions}，min/max范围）                |
+| `templates/screen_templates/004_performance_filter.yaml`| 模板004：跨区间多条件业绩筛选（python_func，动态生成多 JOIN SQL）           |
 | `templates/screen_templates/005_tag_eq.yaml`          | 模板005：权益基金标签筛选（tb_fd_tag_asset_eq）                          |
 | `templates/screen_templates/006_tag_fi.yaml`          | 模板006：固收+基金标签筛选（tb_fd_tag_asset_fi，生产环境）                  |
 | `templates/screen_templates/007_tag_mix.yaml`         | 模板007：混合基金标签筛选（tb_fd_tag_asset_mix，生产环境）                  |

@@ -28,19 +28,25 @@
 
 ## 场景二：多条件业绩筛选
 
-### Case 2.1 — 基础多指标筛选
+### Case 2.1 — 单区间多指标筛选
 - **用户提问示例**：近1年年化收益>10%且最大回撤<20%的权益基金有哪些？
-- **期望路径**：模板004, period_code='近1年', conditions={c_ann_ret:{min:10}, c_mdd:{max:20}}
-- **关键参数**：period_code='近1年', fund_category='权益基金', conditions
+- **期望路径**：模板004, conditions={"近1年": {c_ann_ret:{min:10}, c_mdd:{max:20}}}, fund_category_code='权益基金'
+- **关键参数**：fund_category_code='权益基金', conditions（单区间格式）
 - **状态**：已实现
 
-### Case 2.2 — 全类型扫描
-- **用户提问示例**：近3月表现最好的基金有哪些？（不限类型）
-- **期望路径**：模板004分别对权益/固收加/债券/混合各调用一次，合并展示
-- **关键参数**：period_code='近3月', fund_category 分别传四种类型
-- **状态**：已实现（FundScreenerAgent 需要4次tool call）
+### Case 2.2 — 跨区间多条件筛选
+- **用户提问示例**：近3月最大回撤<10%，同时近1年年化收益>20%的权益基金有哪些？
+- **期望路径**：模板004, conditions={"近3月": {c_mdd:{max:10}}, "近1年": {c_ann_ret:{min:20}}}, fund_category_code='权益基金'
+- **关键参数**：conditions（跨区间格式，SQL 动态生成2个 JOIN）
+- **状态**：已实现
 
-### Case 2.3 — 逐年达标（不走模板）
+### Case 2.3 — 全类型扫描
+- **用户提问示例**：近3月表现最好的基金有哪些？（不限类型）
+- **期望路径**：模板004不传 fund_category_code，返回全部类型
+- **关键参数**：conditions={"近3月": {c_ann_ret:{min:0}}} 或 order_by='近3月.c_ann_ret'
+- **状态**：已实现（不传 fund_category_code 即全部类型）
+
+### Case 2.4 — 逐年达标（不走模板）
 - **用户提问示例**：最近3年每年年化收益都超过8%的基金有哪些？
 - **期望路径**：ask_data_agent → DataQueryAgent 自写SQL（参见 tb_fd_perform_abs table spec 中的逐年达标示例）
 - **关键参数**：N/A（SQL 由 DataQueryAgent 生成）

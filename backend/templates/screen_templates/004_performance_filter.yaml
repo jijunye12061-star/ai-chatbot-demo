@@ -1,60 +1,46 @@
 id: "004"
-name: "单期多条件业绩筛选"
-description: "按指定区间的年化收益、最大回撤、夏普等多项指标组合过滤基金"
-type: sql
+name: "跨区间多条件业绩筛选"
+description: "按多个收益区间的年化收益/最大回撤/夏普等指标组合过滤基金，支持跨区间条件（如近3月回撤<10%且近1年收益>20%）"
+type: python_func
+func: "screen_functions.performance_filter.cross_period_filter"
 
 params:
-  period_code:
-    type: enum
-    description: "收益区间"
-    required: true
-    options:
-      近1月: "00"
-      近3月: "01"
-      近6月: "02"
-      近1年: "03"
-      近2年: "04"
-      近3年: "05"
-      近5年: "06"
-      年初至今: "07"
-      成立以来: "08"
-
-  fund_category:
-    type: string
-    description: "一级分类名称过滤，默认'权益基金'；有值时展开为 AND cat.c_type1_name LIKE %s"
+  trade_date:
+    type: date
+    description: "截止日期，格式 YYYY-MM-DD，默认取最新日期"
     required: false
-    default: "权益基金"
-    fragment: "AND cat.c_type1_name LIKE %s"
+    default: "latest"
+
+  fund_category_code:
+    type: enum
+    description: "基金一级分类，精确匹配"
+    required: false
+    options:
+      权益基金: "001"
+      固收加基金: "002"
+      债券基金: "003"
+      混合基金: "004"
 
   conditions:
-    type: conditions
+    type: cross_period_conditions
     description: |
-      指标约束字典，格式 {字段名: {min: 数值或null, max: 数值或null}}
+      跨区间指标约束字典，格式 {区间名称: {字段名: {min: 数值或null, max: 数值或null}}}
+      区间名称：近1月/近3月/近6月/近1年/近2年/近3年/近5年/年初至今/成立以来
       可用字段：c_ann_ret, c_period_ret, c_mdd, c_sharpe, c_calmar, c_sortino, c_ann_vol, c_break_ratio
-      示例：{"c_ann_ret": {"min": 8, "max": null}, "c_mdd": {"min": null, "max": 15}}
+      示例（单区间）：{"近1年": {"c_ann_ret": {"min": 10, "max": null}, "c_mdd": {"min": null, "max": 20}}}
+      示例（跨区间）：{"近3月": {"c_mdd": {"max": 10}}, "近1年": {"c_ann_ret": {"min": 20}}}
+    required: true
+
+  order_by:
+    type: string
+    description: "排序字段，格式 '区间名称.字段名'，如 '近1年.c_ann_ret'。不传则按第一个条件区间的 c_ann_ret 降序"
     required: false
 
   limit:
     type: int
-    default: 20
+    description: "返回条数，默认50，最大200"
+    required: false
+    default: 50
     max: 200
 
-sql: |
-  SELECT b.c_fd_code, b.c_short_name,
-         cat.c_type1_name, cat.c_type2_name,
-         p.c_ann_ret, p.c_mdd, p.c_sharpe, p.c_calmar, p.c_period_ret
-  FROM tb_fd_perform_abs p
-  JOIN tb_fd_basic_info b ON p.c_fd_code = b.c_fd_code
-  LEFT JOIN (
-      SELECT c_fd_code, c_type1_name, c_type2_name,
-             ROW_NUMBER() OVER (PARTITION BY c_fd_code ORDER BY c_report_date DESC) AS rn
-      FROM tb_fd_category
-  ) cat ON b.c_fd_code = cat.c_fd_code AND cat.rn = 1
-  WHERE p.c_trade_date = (SELECT MAX(c_trade_date) FROM tb_fd_perform_abs)
-    AND p.c_period_code = {:period_code}
-    {?fund_category}
-    {@conditions}
-  ORDER BY p.c_ann_ret DESC
-  LIMIT {:limit}
-
-tags: ["业绩", "多条件", "筛选"]
+tags: ["业绩", "多条件", "跨区间", "筛选"]
