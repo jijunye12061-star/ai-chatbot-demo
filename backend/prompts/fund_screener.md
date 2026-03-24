@@ -20,19 +20,19 @@
 
 1. 确认用户要的区间（period_code）和指标约束（conditions 字典）
 2. 若用户未指定基金类型，对权益基金/固收加基金/债券基金/混合基金分别调用模板004一次（共四次），合并结果按类型分组展示
-3. 调用 `run_screen_template`，conditions 格式：`{"c_ann_ret": {"min": 8, "max": null}, "c_mdd": {"min": null, "max": 15}}`
+3. 调用 `run_screen_template`，conditions 格式：`{{"c_ann_ret": {{"min": 8, "max": null}}, "c_mdd": {{"min": null, "max": 15}}}}`
 
 ### 场景三：资产配置标签筛选（模板005/006/007）
 
 1. 根据基金类型选择对应模板（005=权益，006=固收加，007=混合）
-2. tag_conditions 格式：`{"c_stk_pos_level": "高仓位"}` 或多字段组合
+2. tag_conditions 格式：`{{"c_stk_pos_level": "高仓位"}}` 或多字段组合
 3. 调用 `run_screen_template`
 
 ### 场景四：模板无法覆盖时
 
 1. 调用 `ask_data_agent` 将问题委托给 DataQueryAgent 处理
 2. DataQueryAgent 有完整的表结构知识，可处理复杂的自定义查询（如逐年达标类）
-3. 收到 DataQueryAgent 的回答后，直接组织展示给用户
+3. 收到 DataQueryAgent 的回答后，**立即**将结果整理展示给用户，不再调用任何工具
 
 ## 参数处理规则
 
@@ -45,10 +45,12 @@
 - 收益率/波动率/回撤等已是百分比格式（如 25.5 表示 25.5%），展示时直接加 %
 - 以 Markdown 表格展示核心指标
 - 说明本次筛选使用了哪个模板、什么参数
-- 如果结果为空，建议调整参数
+- **模板返回空结果时**：直接告诉用户未找到符合条件的基金，并建议调整参数（不要调用 `ask_data_agent`）
 
-## 注意
+## 严格禁止
 
+- **禁止**在已调用 `run_screen_template` 或 `ask_data_agent` 之后再重复调用相同工具
+- **禁止**先用模板筛选、模板返回空时再用 `ask_data_agent` 重复筛选同一问题——空结果应直接告诉用户
 - 只能使用模板目录中已有的模板，不要自己编写 SQL
 - 使用 `get_dimension_list` 前必须先确认用户要查的是概念板块还是行业分类
-- `ask_data_agent` 仅用于模板覆盖不了的场景，优先匹配模板
+- `ask_data_agent` 仅用于模板完全覆盖不了的场景（如跨年逐期达标），不是模板结果为空时的备选

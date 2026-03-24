@@ -325,3 +325,53 @@ class TestNewTemplates:
             content = f.read()
         for tid in ["001", "002", "003", "004", "005", "006", "007"]:
             assert tid in content, f"screen_catalog.md 缺少模板 {tid}"
+
+
+class TestRenderSqlParamOrder:
+    """测试混合占位符时 params 顺序与 SQL 中 %s 出现顺序一致（回归 bug #single-pass）"""
+
+    def test_scalar_after_optional_fragment(self):
+        """
+        {:limit} 在 SQL 末尾，{?cat} 在中间，params 顺序应是 cat_like, limit
+        而非 limit, cat_like（旧多趟实现的 bug）
+        """
+        from tools.fund_filter import _render_sql
+        sql = "SELECT * FROM tb WHERE 1=1 {?cat} ORDER BY x LIMIT {:limit}"
+        param_defs = {
+            "cat": {"type": "string", "fragment": "AND x LIKE %s"},
+            "limit": {"type": "int"},
+        }
+        rendered, params = _render_sql(sql, param_defs, {"cat": "权益", "limit": 20})
+        # %s 在 SQL 中出现顺序：先是 AND x LIKE %s，后是 LIMIT %s
+        assert rendered == "SELECT * FROM tb WHERE 1=1 AND x LIKE %s ORDER BY x LIMIT %s"
+        assert params == ("%权益%", 20), f"params 顺序错误: {params}"
+
+    def test_template004_param_order(self):
+        """
+        模拟模板004 SQL 结构：period_code → fund_category(可选) → conditions → limit
+        params 必须按此顺序排列
+        """
+        from tools.fund_filter import _render_sql
+        sql = (
+            "SELECT * FROM tb WHERE p.c_period_code = {:period_code} "
+            "{?fund_category} {@conditions} ORDER BY x LIMIT {:limit}"
+        )
+        param_defs = {
+            "period_code": {"type": "string"},
+            "fund_category": {"type": "string", "fragment": "AND cat.x LIKE %s"},
+            "conditions": {"type": "conditions"},
+            "limit": {"type": "int"},
+        }
+        validated = {
+            "period_code": "03",
+            "fund_category": "权益基金",
+            "conditions": {"c_ann_ret": {"min": 10.0, "max": None}, "c_mdd": {"min": None, "max": 20.0}},
+            "limit": 20,
+        }
+        rendered, params = _render_sql(sql, param_defs, validated)
+        # 期望顺序：period_code, fund_category_like, ann_ret_min, mdd_max, limit
+        assert params[0] == "03", f"第1个参数应是 period_code，实际: {params[0]}"
+        assert params[1] == "%权益基金%", f"第2个参数应是 fund_category LIKE，实际: {params[1]}"
+        assert params[2] == 10.0, f"第3个参数应是 ann_ret min，实际: {params[2]}"
+        assert params[3] == 20.0, f"第4个参数应是 mdd max，实际: {params[3]}"
+        assert params[4] == 20, f"第5个参数应是 limit，实际: {params[4]}"

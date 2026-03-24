@@ -125,6 +125,11 @@ def _validate_params(param_defs: dict, user_params: dict) -> dict:
     return validated
 
 
+_PLACEHOLDER_RE = re.compile(
+    r'\{:(\w+)\}|\{\*(\w+)\}|\{\?(\w+)\}|\{@(\w+)\}|\{#sw_industry\}'
+)
+
+
 def _render_sql(sql_template: str, param_defs: dict, validated_params: dict):
     """
     将 SQL 模板中的具名占位符展开为参数化 SQL。
@@ -135,73 +140,63 @@ def _render_sql(sql_template: str, param_defs: dict, validated_params: dict):
       {@name}  → conditions 类型: AND field >= %s / AND field <= %s
                  dict 类型: AND field = %s （等值匹配）
       {#sw_industry} → SW行业码按长度分组：LEFT(c_sw_code,N) IN (...)
+    单趟从左到右替换，保证 params 顺序与 SQL 中 %s 顺序一致。
     返回 (rendered_sql, params_tuple)
     """
     params = []
-    sql = sql_template
 
-    # 处理 {:name} 标量占位符
-    def _sub_scalar(m):
-        name = m.group(1)
-        if name not in validated_params:
-            raise ValueError(f"渲染SQL时缺少参数: {name}")
-        params.append(validated_params[name])
-        return "%s"
+    def _replace(m):
+        scalar_name, list_name, opt_name, at_name = m.group(1), m.group(2), m.group(3), m.group(4)
 
-    sql = re.sub(r'\{:(\w+)\}', _sub_scalar, sql)
+        if scalar_name is not None:
+            # {:name} 标量
+            if scalar_name not in validated_params:
+                raise ValueError(f"渲染SQL时缺少参数: {scalar_name}")
+            params.append(validated_params[scalar_name])
+            return "%s"
 
-    # 处理 {*name} 列表 IN 占位符
-    def _sub_list(m):
-        name = m.group(1)
-        values = validated_params.get(name, [])
-        if not values:
-            raise ValueError(f"列表参数 {name} 为空，无法构建 IN 子句")
-        placeholders = ", ".join(["%s"] * len(values))
-        params.extend(values)
-        return f"IN ({placeholders})"
+        if list_name is not None:
+            # {*name} 列表 IN
+            values = validated_params.get(list_name, [])
+            if not values:
+                raise ValueError(f"列表参数 {list_name} 为空，无法构建 IN 子句")
+            placeholders = ", ".join(["%s"] * len(values))
+            params.extend(values)
+            return f"IN ({placeholders})"
 
-    sql = re.sub(r'\{\*(\w+)\}', _sub_list, sql)
+        if opt_name is not None:
+            # {?name} 可选片段
+            value = validated_params.get(opt_name)
+            if not value:
+                return ""
+            fragment = param_defs.get(opt_name, {}).get("fragment", "")
+            if not fragment:
+                raise ValueError(f"可选参数 {opt_name} 未定义 fragment 字段")
+            params.append(f"%{value}%")
+            return fragment
 
-    # 处理 {?name} 可选 WHERE 片段
-    def _sub_optional(m):
-        name = m.group(1)
-        value = validated_params.get(name)
-        if not value:
-            return ""
-        fragment = param_defs.get(name, {}).get("fragment", "")
-        if not fragment:
-            raise ValueError(f"可选参数 {name} 未定义 fragment 字段")
-        params.append(f"%{value}%")
-        return fragment
+        if at_name is not None:
+            # {@name} conditions/dict
+            value = validated_params.get(at_name)
+            if not value:
+                return ""
+            ptype = param_defs.get(at_name, {}).get("type", "conditions")
+            parts = []
+            if ptype == "conditions":
+                for field, bounds in value.items():
+                    if bounds.get("min") is not None:
+                        parts.append(f"AND {field} >= %s")
+                        params.append(bounds["min"])
+                    if bounds.get("max") is not None:
+                        parts.append(f"AND {field} <= %s")
+                        params.append(bounds["max"])
+            elif ptype == "dict":
+                for field, val in value.items():
+                    parts.append(f"AND {field} = %s")
+                    params.append(val)
+            return " ".join(parts)
 
-    sql = re.sub(r'\{\?(\w+)\}', _sub_optional, sql)
-
-    # 处理 {@name} conditions/dict 占位符
-    def _sub_at_conditions(m):
-        name = m.group(1)
-        value = validated_params.get(name)
-        if not value:
-            return ""
-        ptype = param_defs.get(name, {}).get("type", "conditions")
-        parts = []
-        if ptype == "conditions":
-            for field, bounds in value.items():
-                if bounds.get("min") is not None:
-                    parts.append(f"AND {field} >= %s")
-                    params.append(bounds["min"])
-                if bounds.get("max") is not None:
-                    parts.append(f"AND {field} <= %s")
-                    params.append(bounds["max"])
-        elif ptype == "dict":
-            for field, val in value.items():
-                parts.append(f"AND {field} = %s")
-                params.append(val)
-        return " ".join(parts)
-
-    sql = re.sub(r'\{@(\w+)\}', _sub_at_conditions, sql)
-
-    # 处理 {#sw_industry} 申万行业码多级匹配
-    def _sub_sw_industry(m):
+        # {#sw_industry}
         sw_codes = validated_params.get("sw_codes", [])
         if not sw_codes:
             return "1=0"
@@ -222,8 +217,7 @@ def _render_sql(sql_template: str, param_defs: dict, validated_params: dict):
             params.extend(codes)
         return "(" + " OR ".join(parts) + ")"
 
-    sql = re.sub(r'\{#sw_industry\}', _sub_sw_industry, sql)
-
+    sql = _PLACEHOLDER_RE.sub(_replace, sql_template)
     return sql, tuple(params)
 
 
