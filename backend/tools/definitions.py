@@ -105,3 +105,39 @@ GENERATE_REPORT_TOOL = {
         },
     },
 }
+
+GET_DIMENSION_LIST_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_dimension_list",
+        "description": "获取概念板块或申万行业分类的全量码+名称列表，供基金筛选时选择匹配的分类码。返回 JSON 数组，每条包含 code/name/parent_code/remark。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "dim_type": {
+                    "type": "string",
+                    "description": "维度类型名称，如 '概念板块' 或 '申万行业分类'",
+                }
+            },
+            "required": ["dim_type"],
+        },
+    },
+}
+
+ASK_DATA_AGENT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "ask_data_agent",
+        "description": "将无法用筛选模板覆盖的子问题委托给 DataQueryAgent 处理，DataQueryAgent 有完整的表结构知识，可以自行写 SQL 查询数据库。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "要委托给 DataQueryAgent 的问题（完整自然语言描述）",
+                }
+            },
+            "required": ["question"],
+        },
+    },
+}

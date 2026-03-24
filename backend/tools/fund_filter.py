@@ -2,6 +2,7 @@
 基金筛选工具：模板加载 + 参数校验 + SQL 渲染 + 执行
 """
 import os
+import re
 import json
 import yaml
 import datetime
@@ -13,6 +14,11 @@ from utils.serializers import json_default
 _TEMPLATES_DIR = os.path.join(
     os.path.dirname(__file__), "..", "templates", "screen_templates"
 )
+
+ALLOWED_CONDITION_FIELDS = {
+    "c_ann_ret", "c_period_ret", "c_mdd", "c_sharpe",
+    "c_calmar", "c_sortino", "c_ann_vol", "c_break_ratio"
+}
 
 
 @lru_cache(maxsize=64)
@@ -90,35 +96,135 @@ def _validate_params(param_defs: dict, user_params: dict) -> dict:
             if "max" in spec:
                 value = min(value, spec["max"])
 
+        elif param_type == "conditions":
+            # {field: {min: value_or_null, max: value_or_null}}
+            if not isinstance(value, dict):
+                raise ValueError(f"参数 {name} 应为字典类型")
+            validated_conditions = {}
+            for field, bounds in value.items():
+                if field not in ALLOWED_CONDITION_FIELDS:
+                    raise ValueError(f"条件字段 '{field}' 不在白名单中，允许字段: {sorted(ALLOWED_CONDITION_FIELDS)}")
+                if not isinstance(bounds, dict):
+                    raise ValueError(f"条件字段 '{field}' 的值应为 {{min: ..., max: ...}} 格式")
+                validated_conditions[field] = {
+                    "min": float(bounds["min"]) if bounds.get("min") is not None else None,
+                    "max": float(bounds["max"]) if bounds.get("max") is not None else None,
+                }
+            value = validated_conditions
+
+        elif param_type == "dict":
+            # {field: enum_value} - 标签字段等值匹配
+            if not isinstance(value, dict):
+                raise ValueError(f"参数 {name} 应为字典类型")
+            allowed_fields = spec.get("allowed_tag_fields", [])
+            for field in value:
+                if field not in allowed_fields:
+                    raise ValueError(f"标签字段 '{field}' 不在允许列表中，允许字段: {allowed_fields}")
+
         validated[name] = value
     return validated
 
 
-def _build_and_execute_sql(template: dict, params: dict) -> list:
+def _render_sql(sql_template: str, param_defs: dict, validated_params: dict):
     """
-    根据模板和参数构建参数化 SQL 并执行。
+    将 SQL 模板中的具名占位符展开为参数化 SQL。
+    占位符类型：
+      {:name}  → %s，值追加到 params
+      {*name}  → IN (%s,...) 按列表长度展开
+      {?name}  → 有值时用 fragment 替换（含 %s），无值时为空串
+      {@name}  → conditions 类型: AND field >= %s / AND field <= %s
+                 dict 类型: AND field = %s （等值匹配）
+      {#sw_industry} → SW行业码按长度分组：LEFT(c_sw_code,N) IN (...)
+    返回 (rendered_sql, params_tuple)
     """
-    sql_template = template["sql"]
-    sql_params = []
+    params = []
+    sql = sql_template
 
-    sql_params.append(params["trade_date"])
-    sql_params.append(params["period_code"])
+    # 处理 {:name} 标量占位符
+    def _sub_scalar(m):
+        name = m.group(1)
+        if name not in validated_params:
+            raise ValueError(f"渲染SQL时缺少参数: {name}")
+        params.append(validated_params[name])
+        return "%s"
 
-    category_filter = ""
-    if params.get("fund_category"):
-        category_filter = "AND cat.c_type1_name LIKE %s"
-        sql_params.append(f"%{params['fund_category']}%")
+    sql = re.sub(r'\{:(\w+)\}', _sub_scalar, sql)
 
-    sql_params.append(params.get("limit", 50))
+    # 处理 {*name} 列表 IN 占位符
+    def _sub_list(m):
+        name = m.group(1)
+        values = validated_params.get(name, [])
+        if not values:
+            raise ValueError(f"列表参数 {name} 为空，无法构建 IN 子句")
+        placeholders = ", ".join(["%s"] * len(values))
+        params.extend(values)
+        return f"IN ({placeholders})"
 
-    sql = sql_template.replace("{category_filter}", category_filter)
+    sql = re.sub(r'\{\*(\w+)\}', _sub_list, sql)
 
-    # safety 校验（防御层，虽然是人工写的模板，防止意外篡改）
-    ok, result = validate_sql(sql)
-    if not ok:
-        raise ValueError(f"SQL 安全校验失败: {result}")
+    # 处理 {?name} 可选 WHERE 片段
+    def _sub_optional(m):
+        name = m.group(1)
+        value = validated_params.get(name)
+        if not value:
+            return ""
+        fragment = param_defs.get(name, {}).get("fragment", "")
+        if not fragment:
+            raise ValueError(f"可选参数 {name} 未定义 fragment 字段")
+        params.append(f"%{value}%")
+        return fragment
 
-    return execute_query(sql, params=tuple(sql_params), readonly=True)
+    sql = re.sub(r'\{\?(\w+)\}', _sub_optional, sql)
+
+    # 处理 {@name} conditions/dict 占位符
+    def _sub_at_conditions(m):
+        name = m.group(1)
+        value = validated_params.get(name)
+        if not value:
+            return ""
+        ptype = param_defs.get(name, {}).get("type", "conditions")
+        parts = []
+        if ptype == "conditions":
+            for field, bounds in value.items():
+                if bounds.get("min") is not None:
+                    parts.append(f"AND {field} >= %s")
+                    params.append(bounds["min"])
+                if bounds.get("max") is not None:
+                    parts.append(f"AND {field} <= %s")
+                    params.append(bounds["max"])
+        elif ptype == "dict":
+            for field, val in value.items():
+                parts.append(f"AND {field} = %s")
+                params.append(val)
+        return " ".join(parts)
+
+    sql = re.sub(r'\{@(\w+)\}', _sub_at_conditions, sql)
+
+    # 处理 {#sw_industry} 申万行业码多级匹配
+    def _sub_sw_industry(m):
+        sw_codes = validated_params.get("sw_codes", [])
+        if not sw_codes:
+            return "1=0"
+        groups = {}
+        for code in sw_codes:
+            length = len(code)
+            if length not in (6, 9, 12):
+                raise ValueError(f"申万行业代码 '{code}' 长度 {length} 无效，应为6/9/12位")
+            groups.setdefault(length, []).append(code)
+        parts = []
+        for length in sorted(groups):
+            codes = groups[length]
+            placeholders = ", ".join(["%s"] * len(codes))
+            if length == 12:
+                parts.append(f"c_sw_code IN ({placeholders})")
+            else:
+                parts.append(f"LEFT(c_sw_code, {length}) IN ({placeholders})")
+            params.extend(codes)
+        return "(" + " OR ".join(parts) + ")"
+
+    sql = re.sub(r'\{#sw_industry\}', _sub_sw_industry, sql)
+
+    return sql, tuple(params)
 
 
 def run_screen_template(template_id: str, params: dict = None) -> str:
@@ -146,7 +252,13 @@ def run_screen_template(template_id: str, params: dict = None) -> str:
     # 根据类型执行
     if template["type"] == "sql":
         try:
-            rows = _build_and_execute_sql(template, validated)
+            rendered_sql, sql_params = _render_sql(
+                template["sql"], template["params"], validated
+            )
+            ok, checked_sql = validate_sql(rendered_sql)
+            if not ok:
+                raise ValueError(f"SQL 安全校验失败: {checked_sql}")
+            rows = execute_query(checked_sql, params=sql_params, readonly=True)
         except Exception as e:
             return f"[查询失败] {type(e).__name__}: {e}"
 

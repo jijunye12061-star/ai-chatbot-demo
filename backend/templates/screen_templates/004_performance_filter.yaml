@@ -1,0 +1,60 @@
+id: "004"
+name: "单期多条件业绩筛选"
+description: "按指定区间的年化收益、最大回撤、夏普等多项指标组合过滤基金"
+type: sql
+
+params:
+  period_code:
+    type: enum
+    description: "收益区间"
+    required: true
+    options:
+      近1月: "00"
+      近3月: "01"
+      近6月: "02"
+      近1年: "03"
+      近2年: "04"
+      近3年: "05"
+      近5年: "06"
+      年初至今: "07"
+      成立以来: "08"
+
+  fund_category:
+    type: string
+    description: "一级分类名称过滤，默认'权益基金'；有值时展开为 AND cat.c_type1_name LIKE %s"
+    required: false
+    default: "权益基金"
+    fragment: "AND cat.c_type1_name LIKE %s"
+
+  conditions:
+    type: conditions
+    description: |
+      指标约束字典，格式 {字段名: {min: 数值或null, max: 数值或null}}
+      可用字段：c_ann_ret, c_period_ret, c_mdd, c_sharpe, c_calmar, c_sortino, c_ann_vol, c_break_ratio
+      示例：{"c_ann_ret": {"min": 8, "max": null}, "c_mdd": {"min": null, "max": 15}}
+    required: false
+
+  limit:
+    type: int
+    default: 20
+    max: 200
+
+sql: |
+  SELECT b.c_fd_code, b.c_short_name,
+         cat.c_type1_name, cat.c_type2_name,
+         p.c_ann_ret, p.c_mdd, p.c_sharpe, p.c_calmar, p.c_period_ret
+  FROM tb_fd_perform_abs p
+  JOIN tb_fd_basic_info b ON p.c_fd_code = b.c_fd_code
+  LEFT JOIN (
+      SELECT c_fd_code, c_type1_name, c_type2_name,
+             ROW_NUMBER() OVER (PARTITION BY c_fd_code ORDER BY c_report_date DESC) AS rn
+      FROM tb_fd_category
+  ) cat ON b.c_fd_code = cat.c_fd_code AND cat.rn = 1
+  WHERE p.c_trade_date = (SELECT MAX(c_trade_date) FROM tb_fd_perform_abs)
+    AND p.c_period_code = {:period_code}
+    {?fund_category}
+    {@conditions}
+  ORDER BY p.c_ann_ret DESC
+  LIMIT {:limit}
+
+tags: ["业绩", "多条件", "筛选"]

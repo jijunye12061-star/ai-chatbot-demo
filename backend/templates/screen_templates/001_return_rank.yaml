@@ -29,6 +29,7 @@ params:
     type: string
     description: "基金一级分类名称过滤（可选），如：权益、固收加、债券、混合"
     required: false
+    fragment: "AND cat.c_type1_name LIKE %s"
 
   limit:
     type: int
@@ -55,10 +56,10 @@ sql: |
              ROW_NUMBER() OVER (PARTITION BY c_fd_code ORDER BY c_report_date DESC) AS rn
       FROM tb_fd_category
   ) cat ON b.c_fd_code = cat.c_fd_code AND cat.rn = 1
-  WHERE p.c_trade_date = %s
-    AND p.c_period_code = %s
-    {category_filter}
+  WHERE p.c_trade_date = {:trade_date}
+    AND p.c_period_code = {:period_code}
+    {?fund_category}
   ORDER BY p.c_period_ret DESC
-  LIMIT %s
+  LIMIT {:limit}
 
 tags: ["收益率", "排名"]

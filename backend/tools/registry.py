@@ -7,6 +7,8 @@ from tools.definitions import (
     RUN_SCREEN_TEMPLATE_TOOL,
     GENERATE_REPORT_TOOL,
     GET_TABLE_SCHEMA_TOOL,
+    GET_DIMENSION_LIST_TOOL,
+    ASK_DATA_AGENT_TOOL,
 )
 
 TOOL_REGISTRY: dict = {}
@@ -38,6 +40,14 @@ def _lazy_register():
     # report generator
     from tools.report_gen import generate_fund_report
     register_tool(GENERATE_REPORT_TOOL, generate_fund_report)
+
+    # dimension lookup (for fund screener)
+    from tools.dimension_lookup import get_dimension_list
+    register_tool(GET_DIMENSION_LIST_TOOL, get_dimension_list)
+
+    # data agent bridge (for fund screener fallback)
+    from tools.data_agent_bridge import ask_data_agent
+    register_tool(ASK_DATA_AGENT_TOOL, ask_data_agent)
 
 
 def get_tool_schemas(names: list) -> list:

@@ -126,15 +126,17 @@ project/
 
 ### 工具层 (`tools/`)
 
-| 文件                        | 职责                                                                                                       |
-|---------------------------|----------------------------------------------------------------------------------------------------------|
-| `tools/registry.py`       | 工具注册表，延迟加载避免循环导入                                                                                         |
-| `tools/definitions.py`    | 所有工具的 JSON Schema：route_to / execute_sql / run_screen_template / generate_fund_report / get_table_schema |
-| `tools/sql_executor.py`   | LLM SQL → safety.validate_sql → 只读执行 → JSON 结果                                                           |
-| `tools/schema_reader.py`  | `get_table_schema(tables)` → 读取 templates/table_specs/*.md → 返回拼接的字段说明                                   |
-| `tools/fund_filter.py`    | 模板加载 + 参数校验 + SQL 渲染 + 执行（`run_screen_template`）                                                         |
-| `tools/screen_functions/` | Python 函数筛选模块（type=python_func 模板用），当前仅骨架                                                                |
-| `tools/report_gen.py`     | 按 fund_report.json 模板，parallel_group 并行生成各节报告                                                            |
+| 文件                          | 职责                                                                                                       |
+|-----------------------------|----------------------------------------------------------------------------------------------------------|
+| `tools/registry.py`         | 工具注册表，延迟加载避免循环导入                                                                                         |
+| `tools/definitions.py`      | 所有工具的 JSON Schema：route_to / execute_sql / run_screen_template / generate_fund_report / get_table_schema / get_dimension_list / ask_data_agent |
+| `tools/sql_executor.py`     | LLM SQL → safety.validate_sql → 只读执行 → JSON 结果                                                           |
+| `tools/schema_reader.py`    | `get_table_schema(tables)` → 读取 templates/table_specs/*.md → 返回拼接的字段说明                                   |
+| `tools/fund_filter.py`      | 模板加载 + 参数校验 + `_render_sql`（具名占位符 {:x}/{*x}/{?x}/{@x}/{#sw_industry}）+ 执行（`run_screen_template`）        |
+| `tools/dimension_lookup.py` | `get_dimension_list(dim_type)` → 查 tb_dict_params → 返回概念/行业码 JSON                                        |
+| `tools/data_agent_bridge.py`| `async ask_data_agent(question)` → 实例化 DataQueryAgent，async for 收集流式输出后返回                              |
+| `tools/screen_functions/`   | Python 函数筛选模块（type=python_func 模板用），当前仅骨架                                                                |
+| `tools/report_gen.py`       | 按 fund_report.json 模板，parallel_group 并行生成各节报告                                                            |
 
 ### Prompt 文件 (`prompts/`)
 
@@ -159,9 +161,17 @@ project/
 | `templates/fund_report.json`                      | 报告节定义（id/title/sql/parallel_group/depends_on）          |
 | `templates/screen_catalog.md`                     | 基金筛选模板目录摘要，始终注入 FundScreenerAgent prompt               |
 | `templates/screen_templates/`                     | 筛选模板 YAML 文件（每个模板含 id/params/sql/type）                 |
-| `templates/screen_templates/001_return_rank.yaml` | 模板001：按指定区间收益率排名筛选基金                                   |
-| `templates/table_specs/tb_stk_industry.md`        | 新增：A股行业归属表规格，dev 适配版（2 个截面）                            |
-| `templates/table_specs/tb_stk_concept.md`         | 新增：A股概念归属表规格，dev 适配版（2 个截面）                            |
+| `templates/screen_templates/001_return_rank.yaml`     | 模板001：按指定区间收益率排名筛选基金（具名占位符格式）                            |
+| `templates/screen_templates/002_concept_exposure.yaml`| 模板002：概念主题曝露度筛选（{*concept_codes}，四层CTE）                   |
+| `templates/screen_templates/003_industry_exposure.yaml`| 模板003：申万行业曝露度筛选（{#sw_industry}，支持一/二/三级混合）             |
+| `templates/screen_templates/004_performance_filter.yaml`| 模板004：单期多条件业绩筛选（{@conditions}，min/max范围）                |
+| `templates/screen_templates/005_tag_eq.yaml`          | 模板005：权益基金标签筛选（tb_fd_tag_asset_eq）                          |
+| `templates/screen_templates/006_tag_fi.yaml`          | 模板006：固收+基金标签筛选（tb_fd_tag_asset_fi，生产环境）                  |
+| `templates/screen_templates/007_tag_mix.yaml`         | 模板007：混合基金标签筛选（tb_fd_tag_asset_mix，生产环境）                  |
+| `templates/table_specs/tb_stk_industry.md`            | A股行业归属表规格，dev 适配版（2 个截面）                                 |
+| `templates/table_specs/tb_stk_concept.md`             | A股概念归属表规格，dev 适配版（2 个截面）                                 |
+| `templates/table_specs/tb_fd_tag_asset_fi.md`         | 新增：固收+基金标签表规格（dev 无此表，生产可用）                             |
+| `templates/table_specs/tb_fd_tag_asset_mix.md`        | 新增：混合基金标签表规格（dev 无此表，生产可用）                             |
 
 ### 工具函数 (`utils/`)
 
@@ -198,6 +208,8 @@ project/
 | `docs/requirements/03-ai-agent.md`         | AI 问答 + 多 Agent 架构设计                         |
 | `docs/requirements/04-api-contract.md`     | 前后端 API 契约（请求/响应格式、SSE 协议）                   |
 | `docs/dev/local-db.md`                     | 本地开发数据库说明：容器信息、建表、数据导入/导出、新增表操作清单            |
+| `docs/specs/2026-03-24-fund-screening-design.md` | 基金筛选功能设计文档（模板002-007 + 重构方案）           |
+| `docs/fund_screener_cases.md`              | 新增：基金筛选问题池（9个场景 case，含期望路径和状态）              |
 | `docs/table_specs_source/`                 | 各表的规格定义源文件（含 16 张表，含 7 张未实现的股票/债券表），是扩表的前置参考 |
 | `docs/archive/`                            | 已归档的历史文档（仅存档，不参与开发）                          |
 

@@ -46,7 +46,9 @@ def test_reject_deep_subquery():
         "SELECT * FROM tb_fd_basic_info WHERE c_fd_code IN "
         "(SELECT c_fd_code FROM tb_fd_nav_daily WHERE c_nav IN "
         "(SELECT c_nav FROM tb_fd_nav_daily WHERE c_fd_code IN "
-        "(SELECT c_fd_code FROM tb_fd_basic_info)))"
+        "(SELECT c_fd_code FROM tb_fd_basic_info WHERE c_fd_code IN "
+        "(SELECT c_fd_code FROM tb_fd_nav_daily WHERE c_nav IN "
+        "(SELECT c_nav FROM tb_fd_nav_daily WHERE c_fd_code > '000001'))))"
     )
     assert not ok
     assert "子查询" in msg or "嵌套" in msg
@@ -122,5 +124,16 @@ def test_subquery_depth_2_allowed():
         "WHERE c_fd_code IN ("
         "  SELECT c_fd_code FROM tb_fd_basic_info WHERE c_class1_name='股票型'"
         ") LIMIT 10"
+    )
+    assert ok
+
+
+def test_subquery_depth_4_allowed():
+    """深度 ≤ 4 应该被允许（支持四层CTE）"""
+    ok, sql = validate_sql(
+        "SELECT * FROM tb_fd_basic_info WHERE c_fd_code IN "
+        "(SELECT c_fd_code FROM tb_fd_nav_daily WHERE c_nav IN "
+        "(SELECT c_nav FROM tb_fd_nav_daily WHERE c_fd_code IN "
+        "(SELECT c_fd_code FROM tb_fd_basic_info)))"
     )
     assert ok

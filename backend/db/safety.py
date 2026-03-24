@@ -63,10 +63,10 @@ def validate_sql(sql: str) -> tuple:
         if t.lower() not in ALLOWED_TABLES:
             return False, f"表 '{t}' 不在白名单中，允许的表：{', '.join(sorted(ALLOWED_TABLES))}"
 
-    # 6. 子查询深度 ≤ 2
+    # 6. 子查询深度 ≤ 4
     depth = _subquery_depth(sql)
-    if depth > 2:
-        return False, f"子查询嵌套过深（{depth} 层），最大允许 2 层"
+    if depth > 4:
+        return False, f"子查询嵌套过深（{depth} 层），最大允许 4 层"
 
     # 7. 注入 LIMIT（如缺失）
     if not re.search(r"\bLIMIT\b", sql, re.IGNORECASE):

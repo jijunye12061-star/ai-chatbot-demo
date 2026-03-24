@@ -85,3 +85,29 @@ WHERE p.c_period_code = '03'
 ORDER BY p.c_sharpe DESC
 LIMIT 20;
 ```
+
+## 逐年达标查询示例（DataQueryAgent 处理）
+
+> 注意：此类查询不走 FundScreenerAgent 模板，由 DataQueryAgent 自行写 SQL。
+
+```sql
+-- 查询最近3年每年年化收益都大于8%的基金
+-- 思路：每年取一个 trade_date 截面（如年末），筛选 period_code='03'，
+--       则对同一基金做3个年份的 AND 连接
+-- 简化写法：统计符合条件的年份数 = 3
+SELECT p.c_fd_code, b.c_short_name,
+       COUNT(DISTINCT YEAR(p.c_trade_date)) AS qualifying_years
+FROM tb_fd_perform_abs p
+JOIN tb_fd_basic_info b ON p.c_fd_code = b.c_fd_code
+WHERE p.c_period_code = '03'
+  AND p.c_ann_ret > 8
+  AND YEAR(p.c_trade_date) IN (
+      YEAR(CURDATE()) - 1,
+      YEAR(CURDATE()) - 2,
+      YEAR(CURDATE()) - 3
+  )
+GROUP BY p.c_fd_code, b.c_short_name
+HAVING qualifying_years = 3
+ORDER BY p.c_fd_code
+LIMIT 50;
+```

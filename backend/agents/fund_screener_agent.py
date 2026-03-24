@@ -14,7 +14,7 @@ class FundScreenerAgent(BaseAgent):
         super().__init__(
             name="FundScreenerAgent",
             prompt_file="fund_screener.md",
-            tool_names=["run_screen_template"],
+            tool_names=["run_screen_template", "get_dimension_list", "ask_data_agent"],
         )
 
     def _load_prompt(self, filename: str) -> str:
