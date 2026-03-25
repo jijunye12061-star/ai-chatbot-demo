@@ -2,13 +2,12 @@
 工具注册表：维护 tool_name → {schema, func} 的映射
 """
 from tools.definitions import (
-    ROUTE_TO_TOOL,
     EXECUTE_SQL_TOOL,
-    RUN_SCREEN_TEMPLATE_TOOL,
     GENERATE_REPORT_TOOL,
     GET_TABLE_SCHEMA_TOOL,
     GET_DIMENSION_LIST_TOOL,
-    ASK_DATA_AGENT_TOOL,
+    GET_SCREEN_GUIDE_TOOL,
+    ASK_REPORT_AGENT_TOOL,
 )
 
 TOOL_REGISTRY: dict = {}
@@ -33,10 +32,6 @@ def _lazy_register():
     from tools.sql_executor import execute_sql
     register_tool(EXECUTE_SQL_TOOL, execute_sql)
 
-    # fund screener (template-based)
-    from tools.fund_filter import run_screen_template
-    register_tool(RUN_SCREEN_TEMPLATE_TOOL, run_screen_template)
-
     # report generator
     from tools.report_gen import generate_fund_report
     register_tool(GENERATE_REPORT_TOOL, generate_fund_report)
@@ -45,9 +40,13 @@ def _lazy_register():
     from tools.dimension_lookup import get_dimension_list
     register_tool(GET_DIMENSION_LIST_TOOL, get_dimension_list)
 
-    # data agent bridge (for fund screener fallback)
-    from tools.data_agent_bridge import ask_data_agent
-    register_tool(ASK_DATA_AGENT_TOOL, ask_data_agent)
+    # screen guide reader (for fund screener)
+    from tools.screen_guide_reader import get_screen_guide as _get_screen_guide
+    register_tool(GET_SCREEN_GUIDE_TOOL, _get_screen_guide)
+
+    # report agent bridge
+    from tools.report_agent_bridge import ask_report_agent as _ask_report_agent
+    register_tool(ASK_REPORT_AGENT_TOOL, _ask_report_agent)
 
 
 def get_tool_schemas(names: list) -> list:

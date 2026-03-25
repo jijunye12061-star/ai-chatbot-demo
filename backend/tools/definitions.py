@@ -2,29 +2,6 @@
 所有 Function Calling 工具的 JSON Schema 定义
 """
 
-ROUTE_TO_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "route_to",
-        "description": "将用户请求路由到合适的 Agent 处理",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "agent_key": {
-                    "type": "string",
-                    "enum": ["chat", "fund_screen", "data_query", "report"],
-                    "description": "目标 Agent 标识：chat=闲聊/知识问答，fund_screen=基金筛选，data_query=数据库查询，report=报告生成",
-                },
-                "reason": {
-                    "type": "string",
-                    "description": "路由原因（一句话说明）",
-                },
-            },
-            "required": ["agent_key"],
-        },
-    },
-}
-
 EXECUTE_SQL_TOOL = {
     "type": "function",
     "function": {
@@ -43,28 +20,6 @@ EXECUTE_SQL_TOOL = {
                 },
             },
             "required": ["sql"],
-        },
-    },
-}
-
-RUN_SCREEN_TEMPLATE_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "run_screen_template",
-        "description": "执行基金筛选模板。根据 prompt 中的模板目录选择合适的模板 ID，传入所需参数执行筛选。",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "template_id": {
-                    "type": "string",
-                    "description": "模板 ID，如 '001'。必须从模板目录中选择。",
-                },
-                "params": {
-                    "type": "object",
-                    "description": "模板所需参数，键值对。参数名和取值参考模板目录中的参数说明。",
-                },
-            },
-            "required": ["template_id", "params"],
         },
     },
 }
@@ -124,20 +79,44 @@ GET_DIMENSION_LIST_TOOL = {
     },
 }
 
-ASK_DATA_AGENT_TOOL = {
+GET_SCREEN_GUIDE_TOOL = {
     "type": "function",
     "function": {
-        "name": "ask_data_agent",
-        "description": "将无法用筛选模板覆盖的子问题委托给 DataQueryAgent 处理，DataQueryAgent 有完整的表结构知识，可以自行写 SQL 查询数据库。",
+        "name": "get_screen_guide",
+        "description": "获取基金筛选场景的 SQL 写法知识文档。筛选前必须先调用此工具了解正确的 SQL 模式。",
         "parameters": {
             "type": "object",
             "properties": {
-                "question": {
-                    "type": "string",
-                    "description": "要委托给 DataQueryAgent 的问题（完整自然语言描述）",
+                "scenarios": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "场景名称列表，可选值：concept_exposure（概念筛选）、"
+                        "industry_exposure（行业筛选）、performance_filter（业绩筛选）、"
+                        "tag_equity（权益标签）、tag_fixed_income（固收+标签）、"
+                        "tag_mixed（混合标签）"
+                    ),
                 }
             },
-            "required": ["question"],
+            "required": ["scenarios"],
+        },
+    },
+}
+
+ASK_REPORT_AGENT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "ask_report_agent",
+        "description": "委托报告 Agent 生成指定基金的完整研究报告。只在用户明确要求生成报告时调用。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "fund_code": {
+                    "type": "string",
+                    "description": "基金代码，如 '000001'",
+                }
+            },
+            "required": ["fund_code"],
         },
     },
 }
