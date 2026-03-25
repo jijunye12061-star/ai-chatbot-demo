@@ -69,8 +69,9 @@ class BaseAgent:
                 continue
 
             else:
-                async for chunk in stream_text(full_messages):
-                    yield chunk
+                # finish_reason == "stop"：内容已在非流式响应里，直接 yield，
+                # 避免再次流式调用时 DeepSeek 输出 raw tool-call special tokens
+                yield choice.message.content or ""
                 break
         else:
             # FC 循环跑满未 break — 兜底提示，防止空回复
