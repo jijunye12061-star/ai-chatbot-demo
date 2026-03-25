@@ -28,7 +28,7 @@ class TestScreenGuideReader:
         from tools.screen_guide_reader import get_screen_guide
         result = get_screen_guide(["concept_exposure", "performance_filter"])
         # 多个场景用分隔线隔开
-        assert "---" in result
+        assert "\n\n---\n\n" in result
         assert "tb_stk_concept" in result
         assert "tb_fd_perform_abs" in result
 
