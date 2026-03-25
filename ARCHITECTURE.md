@@ -112,66 +112,58 @@ project/
 |-----------------|-----------------------------------------------------------------------------|
 | `llm/client.py` | AsyncOpenAI 封装：`chat_completion()`（非流式）、`stream_text()`（流式 async generator） |
 
-### 多 Agent 层 (`agents/`)
+### Agent 层 (`agents/`)
 
-| 文件                              | 职责                                                                     |
-|---------------------------------|------------------------------------------------------------------------|
-| `agents/orchestrator.py`        | 总调度入口：message + history → RouterAgent → 分发到具体 Agent                    |
-| `agents/base.py`                | BaseAgent 基类：Function Calling 循环（检测 tool_calls → 执行 → 流式最终回复）          |
-| `agents/router_agent.py`        | 意图路由：LLM tool_call + 关键词兜底，返回 agent_key                                |
-| `agents/chat_agent.py`          | 兜底闲聊 Agent，无工具                                                         |
-| `agents/data_query_agent.py`    | 数据查询 Agent，注入 table_catalog，使用 get_table_schema + execute_sql 工具（两层召回） |
-| `agents/fund_screener_agent.py` | 基金筛选 Agent，注入 screen_catalog，使用 run_screen_template 工具（模板填参架构）         |
-| `agents/report_agent.py`        | 报告生成 Agent，先提示再调用 generate_fund_report 工具                              |
+| 文件                          | 职责                                                                                       |
+|-----------------------------|------------------------------------------------------------------------------------------|
+| `agents/orchestrator.py`    | 总调度入口：message + history → 直接实例化 MainAgent → 流式输出（已简化，无 RouterAgent）                    |
+| `agents/base.py`            | BaseAgent 基类：Function Calling 循环（检测 tool_calls → 执行 → 流式最终回复）                          |
+| `agents/main_agent.py`      | 单一主 Agent：注入 table_catalog + screen_catalog，使用全部 5 个工具，处理数据查询/基金筛选/报告/闲聊 |
+| `agents/report_agent.py`    | 报告生成 subagent，先提示再调用 generate_fund_report 工具，由 report_agent_bridge 调用               |
 
 ### 工具层 (`tools/`)
 
-| 文件                          | 职责                                                                                                       |
-|-----------------------------|----------------------------------------------------------------------------------------------------------|
-| `tools/registry.py`         | 工具注册表，延迟加载避免循环导入                                                                                         |
-| `tools/definitions.py`      | 所有工具的 JSON Schema：route_to / execute_sql / run_screen_template / generate_fund_report / get_table_schema / get_dimension_list / ask_data_agent |
-| `tools/sql_executor.py`     | LLM SQL → safety.validate_sql → 只读执行 → JSON 结果                                                           |
-| `tools/schema_reader.py`    | `get_table_schema(tables)` → 读取 templates/table_specs/*.md → 返回拼接的字段说明                                   |
-| `tools/fund_filter.py`      | 模板加载 + 参数校验 + `_render_sql`（具名占位符 {:x}/{*x}/{?x}/{@x}/{#sw_industry}）+ 执行（`run_screen_template`）        |
-| `tools/dimension_lookup.py` | `get_dimension_list(dim_type)` → 查 tb_dict_params → 返回概念/行业码 JSON                                        |
-| `tools/data_agent_bridge.py`| `async ask_data_agent(question)` → 实例化 DataQueryAgent，async for 收集流式输出后返回                              |
-| `tools/screen_functions/`   | Python 函数筛选模块（type=python_func 模板用）                                                                       |
-| `tools/screen_functions/performance_filter.py` | 模板004 执行函数：`cross_period_filter`，动态生成跨区间多 JOIN SQL      |
-| `tools/report_gen.py`       | 按 fund_report.json 模板，parallel_group 并行生成各节报告                                                            |
+| 文件                              | 职责                                                                                              |
+|---------------------------------|--------------------------------------------------------------------------------------------------|
+| `tools/registry.py`             | 工具注册表，延迟加载避免循环导入                                                                                 |
+| `tools/definitions.py`          | 所有工具的 JSON Schema：execute_sql / get_table_schema / get_dimension_list / get_screen_guide / generate_fund_report（共 5 个）|
+| `tools/sql_executor.py`         | LLM SQL → safety.validate_sql → 只读执行 → JSON 结果                                                   |
+| `tools/schema_reader.py`        | `get_table_schema(tables)` → 读取 templates/table_specs/*.md → 返回拼接的字段说明                           |
+| `tools/dimension_lookup.py`     | `get_dimension_list(dim_type)` → 查 tb_dict_params → 返回概念/行业码 JSON                               |
+| `tools/screen_guide_reader.py`  | `get_screen_guide(guide_name)` → 读取 templates/screen_guides/*.md → 返回筛选知识文档，供 AI 写 SQL 参考        |
+| `tools/report_agent_bridge.py`  | `async ask_report_agent(fund_code)` → 实例化 ReportAgent，收集流式输出后返回                                  |
+| `tools/report_gen.py`           | 按 fund_report.json 模板，parallel_group 并行生成各节报告                                                    |
 
 ### Prompt 文件 (`prompts/`)
 
-| 文件                            | 用途                                                                   |
-|-------------------------------|----------------------------------------------------------------------|
-| `prompts/chat.md`             | ChatAgent system prompt                                              |
-| `prompts/router.md`           | RouterAgent system prompt，定义4种意图和路由规则                                |
-| `prompts/data_query.md`       | DataQueryAgent prompt，含 `{table_catalog}` 和 `{today}` 占位符，两层召回工作流程说明 |
-| `prompts/fund_screener.md`    | FundScreenerAgent prompt                                             |
-| `prompts/report_writer.md`    | ReportAgent system prompt                                            |
-| `prompts/report_basic.md`     | 基础信息节 prompt                                                         |
-| `prompts/report_nav.md`       | 净值表现节 prompt                                                         |
-| `prompts/report_portfolio.md` | 持仓结构节 prompt                                                         |
-| `prompts/report_summary.md`   | 综合评价节 prompt                                                         |
+| 文件                            | 用途                                                                                              |
+|-------------------------------|--------------------------------------------------------------------------------------------------|
+| `prompts/main_agent.md`       | MainAgent 统一 system prompt，含 `{table_catalog}` / `{screen_catalog}` / `{today}` 占位符，覆盖全部意图 |
+| `prompts/report_writer.md`    | ReportAgent system prompt                                                                        |
+| `prompts/report_basic.md`     | 基础信息节 prompt                                                                                    |
+| `prompts/report_nav.md`       | 净值表现节 prompt                                                                                    |
+| `prompts/report_portfolio.md` | 持仓结构节 prompt                                                                                    |
+| `prompts/report_summary.md`   | 综合评价节 prompt                                                                                    |
 
 ### 模板文件 (`templates/`)
 
-| 文件                                                | 用途                                                     |
-|---------------------------------------------------|--------------------------------------------------------|
-| `templates/table_catalog.md`                      | 9张表的极简目录（一行一表），始终注入 DataQueryAgent prompt              |
-| `templates/table_specs/`                          | 每张表一个 md 文件，按需通过 get_table_schema 工具加载（含字段清单、枚举值、查询示例） |
-| `templates/fund_report.json`                      | 报告节定义（id/title/sql/parallel_group/depends_on）          |
-| `templates/screen_catalog.md`                     | 基金筛选模板目录摘要，始终注入 FundScreenerAgent prompt               |
-| `templates/screen_templates/`                     | 筛选模板 YAML 文件（每个模板含 id/params/sql/type）                 |
-| `templates/screen_templates/002_concept_exposure.yaml`| 模板002：概念主题曝露度筛选（{*concept_codes}，四层CTE）                   |
-| `templates/screen_templates/003_industry_exposure.yaml`| 模板003：申万行业曝露度筛选（{#sw_industry}，支持一/二/三级混合）             |
-| `templates/screen_templates/004_performance_filter.yaml`| 模板004：跨区间多条件业绩筛选（python_func，动态生成多 JOIN SQL）           |
-| `templates/screen_templates/005_tag_eq.yaml`          | 模板005：权益基金标签筛选（tb_fd_tag_asset_eq）                          |
-| `templates/screen_templates/006_tag_fi.yaml`          | 模板006：固收+基金标签筛选（tb_fd_tag_asset_fi，生产环境）                  |
-| `templates/screen_templates/007_tag_mix.yaml`         | 模板007：混合基金标签筛选（tb_fd_tag_asset_mix，生产环境）                  |
-| `templates/table_specs/tb_stk_industry.md`            | A股行业归属表规格，dev 适配版（2 个截面）                                 |
-| `templates/table_specs/tb_stk_concept.md`             | A股概念归属表规格，dev 适配版（2 个截面）                                 |
-| `templates/table_specs/tb_fd_tag_asset_fi.md`         | 新增：固收+基金标签表规格（dev 无此表，生产可用）                             |
-| `templates/table_specs/tb_fd_tag_asset_mix.md`        | 新增：混合基金标签表规格（dev 无此表，生产可用）                             |
+| 文件                                        | 用途                                                                              |
+|-------------------------------------------|---------------------------------------------------------------------------------|
+| `templates/table_catalog.md`              | 9张表的极简目录（一行一表），始终注入 MainAgent prompt                                           |
+| `templates/table_specs/`                  | 每张表一个 md 文件，按需通过 get_table_schema 工具加载（含字段清单、枚举值、查询示例）                          |
+| `templates/fund_report.json`              | 报告节定义（id/title/sql/parallel_group/depends_on）                                   |
+| `templates/screen_catalog.md`             | 基金筛选知识文档索引，始终注入 MainAgent prompt，指引 AI 调用 get_screen_guide 获取详细知识               |
+| `templates/screen_guides/`                | 基金筛选知识文档（6 个 .md，按需通过 get_screen_guide 加载，AI 据此写 SQL）                          |
+| `templates/screen_guides/concept_exposure.md`   | 概念主题曝露度筛选知识（tb_stk_concept + tb_fd_portfolio_stk，CTE 写法）                 |
+| `templates/screen_guides/industry_exposure.md`  | 申万行业曝露度筛选知识（tb_stk_industry，一/二/三级混合 LIKE 匹配）                          |
+| `templates/screen_guides/performance_filter.md` | 业绩指标筛选知识（tb_fd_perform_abs，跨区间动态 JOIN 写法）                              |
+| `templates/screen_guides/tag_equity.md`         | 权益基金标签筛选知识（tb_fd_tag_asset_eq，枚举值说明）                                   |
+| `templates/screen_guides/tag_fixed_income.md`   | 固收+基金标签筛选知识（tb_fd_tag_asset_fi，生产环境）                                   |
+| `templates/screen_guides/tag_mixed.md`          | 混合基金标签筛选知识（tb_fd_tag_asset_mix，生产环境）                                   |
+| `templates/table_specs/tb_stk_industry.md`      | A股行业归属表规格，dev 适配版（2 个截面）                                               |
+| `templates/table_specs/tb_stk_concept.md`       | A股概念归属表规格，dev 适配版（2 个截面）                                               |
+| `templates/table_specs/tb_fd_tag_asset_fi.md`   | 固收+基金标签表规格（dev 无此表，生产可用）                                               |
+| `templates/table_specs/tb_fd_tag_asset_mix.md`  | 混合基金标签表规格（dev 无此表，生产可用）                                               |
 
 ### 工具函数 (`utils/`)
 
@@ -181,10 +173,12 @@ project/
 
 ### 测试 (`tests/`)
 
-| 文件                              | 用途                                                 |
-|---------------------------------|----------------------------------------------------|
-| `tests/test_sql_safety.py`      | SQL 安全校验单测（14个 case，无需 DB/LLM）                     |
-| `tests/test_screen_template.py` | 模板系统单测（12个 case：模板加载/参数校验/枚举映射/prompt注入，无需 DB/LLM） |
+| 文件                                 | 用途                                                             |
+|------------------------------------|----------------------------------------------------------------|
+| `tests/test_sql_safety.py`         | SQL 安全校验单测（14个 case，无需 DB/LLM）                               |
+| `tests/test_screen_guide_reader.py`| screen_guide_reader 单测（guide 加载/不存在错误处理，无需 DB/LLM）            |
+| `tests/test_definitions.py`        | tools/definitions.py 工具定义单测（确认 5 个工具 schema 完整，无需 DB/LLM）     |
+| `tests/test_orchestrator.py`       | orchestrator 集成测试（MainAgent 路径，无需真实 LLM）                      |
 
 ---
 
@@ -217,7 +211,7 @@ project/
 
 ## 关键数据流
 
-### AI 问答流（多 Agent 架构）
+### AI 问答流（Single MainAgent 架构）
 
 ```
 用户输入
@@ -225,9 +219,10 @@ project/
   → ChatView.vue → useChatStore().send()
   → api/chat.js sendMessage() → POST /api/chat
   → backend: api/chat.py (async) → orchestrator.run()
-    → RouterAgent.classify() → 识别意图（chat/data_query/fund_screen/report）
-    → 分发到对应 Agent.run()
+    → MainAgent.run()（直接，无路由步骤）
       → BaseAgent FC循环：chat_completion(tools) → 有 tool_calls → 执行工具 → 继续
+        可调用工具：execute_sql / get_table_schema / get_dimension_list
+                    get_screen_guide / generate_fund_report（→ ReportAgent subagent）
       → 最终：stream_text() 流式输出
   → yield SSE chunks → onChunk() 追加到 message.content
   → MessageBubble.vue 实时渲染
