@@ -109,37 +109,113 @@
 
 ## 三、后端变更
 
-### `agents/base.py` — FC 循环
+### 完整数据流（后端）
 
-在每次工具调用前后 yield thinking 事件：
-
-```python
-# 调用工具前
-yield thinking_event(step=f"正在执行：{tool_name}...", status="running")
-
-# 调用工具后（成功）
-yield thinking_event(step=f"{tool_name} 完成", status="done")
-
-# 调用工具后（失败）
-yield thinking_event(step=f"{tool_name} 失败，正在重试...", status="error")
+```
+sql_executor.py
+  └─ 执行 SQL → 返回 ToolResult(summary_text, full_rows)
+        ↓
+agents/base.py（FC 循环）
+  ├─ yield SSE: {"type":"thinking", ...}       ← 工具调用前后
+  ├─ 将 summary_text 注入 tool 消息上下文       ← 进 LLM
+  └─ 若 full_rows 存在: yield SSE: {"type":"result_data", ...}  ← 绕过 LLM
+        ↓
+agents/orchestrator.py
+  └─ 将所有 yield 转为已格式化的 SSE 行（data: {...}\n\n）
+        ↓
+api/chat.py
+  └─ StreamingResponse 透传，不再二次包装
 ```
 
-### `tools/sql_executor.py` — 结果分流
+### `tools/sql_executor.py` — 返回 ToolResult
 
-SQL 执行后，工具层负责：
+`execute_sql` 从返回纯字符串改为返回结构化对象，由 `base.py` 统一处理分流：
 
-1. 截取前5条 + 总数，拼成 Markdown 表格文本 → 返回给 LLM 作为工具结果（进入上下文）
-2. 将完整结果序列化为 `result_data` SSE 事件 → 直接 yield 给前端（绕过 LLM）
+```python
+@dataclass
+class ToolResult:
+    summary: str          # 前5条 + 总数的 Markdown 表格文本，进入 LLM 上下文
+    full_rows: list | None  # 完整行数据；若行数 <= 5 则为 None（不触发 result_data）
+    columns: list | None    # 列名列表
 
-> 只有 `execute_sql` 工具触发 `result_data`；其他工具（schema_reader、screen_guide_reader 等）不触发。
+# execute_sql 返回示例：
+# ToolResult(
+#   summary="查询结果：共 87 条，前5条如下：\n| 基金名称 | ...",
+#   full_rows=[[...], ...],   # 所有 87 条
+#   columns=["基金名称", "近1年", ...]
+# )
+```
+
+> 只有 `execute_sql` 返回 `ToolResult`；其他工具仍返回纯字符串，`base.py` 做类型判断。
+> 只有 `full_rows` 不为 None（即结果行数 > 5）时才 yield `result_data`，避免中间查询的单行结果弹出表格。
+
+### `agents/base.py` — FC 循环
+
+```python
+# 1. 调用工具前 yield thinking（running）
+yield format_sse({"type": "thinking", "step": f"正在查询：{tool_name}...", "status": "running"})
+
+# 2. 执行工具
+result = await execute_tool(tool_name, tool_args)
+
+# 3. 调用工具后 yield thinking（done / error）
+yield format_sse({"type": "thinking", "step": f"{friendly_name} 完成", "status": "done"})
+
+# 4. 若是 ToolResult，分流处理
+if isinstance(result, ToolResult):
+    tool_message_content = result.summary          # 进 LLM 上下文
+    if result.full_rows is not None:
+        yield format_sse({                         # 绕过 LLM，直达前端
+            "type": "result_data",
+            "columns": result.columns,
+            "rows": result.full_rows
+        })
+else:
+    tool_message_content = result                  # 其他工具，纯字符串直接进上下文
+```
+
+### `agents/orchestrator.py` — SSE 格式化层
+
+orchestrator 统一负责将所有 yield 内容格式化为完整 SSE 行，`api/chat.py` 只做透传：
+
+```python
+def format_sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+```
+
+最终文本片段（`stream_text()` 输出）也封装为 `{"type": "content", "content": "...", "done": false}`，统一格式。
 
 ### `api/chat.py` — StreamingResponse
 
-透传所有 SSE 事件类型，不做过滤。
+移除当前的二次包装逻辑（`{"content": chunk, "done": False}`），改为直接透传 orchestrator yield 出的已格式化 SSE 行：
+
+```python
+async def event_stream():
+    async for line in orchestrator.run(message, history):
+        yield line  # 已是完整的 "data: {...}\n\n" 格式
+```
 
 ---
 
 ## 四、前端变更
+
+### 完整数据流（前端）
+
+```
+api/chat.js（sendMessage）
+  └─ 读取 SSE，解析 JSON，按 type 分发到回调
+        ↓
+stores/chat.js（send）
+  ├─ onThinking(step, status) → 追加到 msg.thinkingSteps
+  ├─ onResultData(columns, rows) → 赋值到 msg.resultData
+  ├─ onChunk(content) → 追加到 msg.content；第一次时设 thinkingCollapsed=true
+  └─ onDone() → 设 msg.streaming=false，写入 history
+        ↓
+MessageBubble.vue
+  ├─ <ThinkingTimeline :steps="msg.thinkingSteps" v-model:collapsed="msg.thinkingCollapsed" />
+  ├─ 渲染 msg.content（Markdown）
+  └─ <ResultTable v-if="msg.resultData" :columns="..." :rows="..." />
+```
 
 ### 新增组件
 
@@ -147,12 +223,15 @@ SQL 执行后，工具层负责：
 
 Props：
 - `steps: Array<{step: string, status: 'done'|'running'|'error'}>`
-- `collapsed: Boolean`
+- `collapsed: Boolean`（v-model 绑定，由父组件/Store 持有状态）
+
+Emits：
+- `update:collapsed`（Boolean）— 用户点击展开/折叠时通知父组件
 
 行为：
-- `collapsed=false`：展示完整时间轴（阶段一）
-- `collapsed=true`：展示胶囊摘要按钮，点击切换展开/折叠（阶段二/三）
-- 答案开始输出（收到第一个 `type:content` 事件）时，自动折叠
+- `collapsed=false`：展示完整时间轴卡片（阶段一）
+- `collapsed=true`：展示胶囊摘要按钮，点击时 emit `update:collapsed` → Store 更新 `thinkingCollapsed`
+- 折叠状态由 Store 的 `thinkingCollapsed` 字段持有，组件是纯受控组件，不自管状态
 
 **`components/chat/ResultTable.vue`**
 
@@ -177,6 +256,28 @@ Props：
 **`ChatWindow.vue`**
 
 - 背景色改为 `#f7f5f2`
+
+### 修改 `api/chat.js` — SSE 解析
+
+`sendMessage()` 增加 `onThinking` 和 `onResultData` 回调参数，SSE 解析按 `type` 分发：
+
+```js
+// 新签名
+sendMessage(text, history, { onChunk, onThinking, onResultData, onDone, onError })
+
+// SSE 解析逻辑
+const event = JSON.parse(data)
+if (!event.type || event.type === 'content') {
+  if (event.done) onDone()
+  else onChunk(event.content)
+} else if (event.type === 'thinking') {
+  onThinking(event.step, event.status)
+} else if (event.type === 'result_data') {
+  onResultData(event.columns, event.rows)
+}
+```
+
+旧的 `onChunk` / `onDone` / `onError` 单参数调用方式保持向后兼容（检测第三个参数类型）。
 
 ### 修改 Store（`stores/chat.js`）
 

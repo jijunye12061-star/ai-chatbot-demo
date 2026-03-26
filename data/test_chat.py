@@ -7,7 +7,7 @@
   python data/test_chat.py --group fund_screen          # 运行某类预置用例
   python data/test_chat.py --all                        # 跑全部预置用例（逐条确认）
 
-直接调用 orchestrator.run()，日志（[Router]/[Agent]/[Tool] 等）实时输出在终端。
+直接调用 orchestrator.run()，[MainAgent]/[Tool] 日志实时输出在终端。
 """
 import sys
 import asyncio
@@ -34,16 +34,19 @@ TEST_GROUPS = {
         "帮我查下权益类基金有哪些？列出基金名和代码",
     ],
     "fund_screen": [
-        # 模板002：概念主题曝露度
+        # 概念主题曝露度（concept_exposure）
         "筛选持有新能源汽车概念股较多的权益基金",
         "哪些基金重仓了人工智能概念股？",
-        # 模板003：申万行业曝露度
+        # 申万行业曝露度（industry_exposure）
         "筛选重仓电子行业的权益基金",
-        # 模板004：跨区间多条件业绩筛选
+        "重仓医药生物行业的权益基金有哪些？",
+        # 跨区间多条件业绩筛选（performance_filter）
         "筛选近1年年化收益率大于10%且最大回撤小于15%的权益基金",
         "近3月最大回撤小于10%，同时近1年年化收益大于20%的权益基金有哪些？",
-        # 模板005：权益标签
+        # 权益标签筛选（tag_equity）
         "有哪些高仓位的权益基金？",
+        # 混合场景：先筛选再追问
+        "筛选近1年收益超过15%的权益基金，按收益率从高到低列出前10名",
     ],
 }
 
