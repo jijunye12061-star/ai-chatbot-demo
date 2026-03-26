@@ -22,7 +22,12 @@
         </svg>
       </button>
     </div>
-    <p class="hint" v-if="disabled">AI 正在思考中…</p>
+    <p class="hint" v-if="disabled">
+      <span class="hint-dots">
+        <span /><span /><span />
+      </span>
+      AI 正在思考中
+    </p>
   </div>
 </template>
 
@@ -56,7 +61,7 @@ function handleSend() {
 <style scoped>
 .input-area {
   padding: 12px 20px 16px;
-  background: #f7f8fc;
+  background: #f8fafc;
   border-top: 1px solid #e2e8f0;
   flex-shrink: 0;
 }
@@ -73,8 +78,8 @@ function handleSend() {
 }
 
 .input-box:focus-within {
-  border-color: #818cf8;
-  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
 }
 
 .input-box.disabled {
@@ -128,26 +133,52 @@ textarea:disabled {
 }
 
 .send-btn.active {
-  background: linear-gradient(135deg, #818cf8, #6366f1);
+  background: linear-gradient(135deg, #f97316, #ea580c);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
 }
 
 .send-btn.active:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.45);
 }
 
 .send-btn:disabled {
   cursor: not-allowed;
 }
 
+/* 思考中提示 */
 .hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
-  color: #818cf8;
-  margin-top: 7px;
+  color: #ea580c;
+  margin-top: 8px;
   padding-left: 4px;
   animation: fadein 0.3s ease;
+}
+
+.hint-dots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.hint-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f97316;
+  animation: bounce 1.2s ease-in-out infinite;
+}
+
+.hint-dots span:nth-child(2) { animation-delay: 0.2s; }
+.hint-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }
 
 @keyframes fadein {

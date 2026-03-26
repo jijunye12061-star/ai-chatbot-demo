@@ -8,7 +8,9 @@
           <p class="page-subtitle">整合量化研究成果，提供专业数据分析与 AI 智能问答服务</p>
         </div>
         <router-link to="/chat" class="ai-entry-btn">
-          <span class="ai-btn-icon">✦</span>
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+            <path d="M10 2a1 1 0 011 1v1.07A6.002 6.002 0 0115.93 9H17a1 1 0 010 2h-1.07A6.002 6.002 0 0111 15.93V17a1 1 0 01-2 0v-1.07A6.002 6.002 0 014.07 11H3a1 1 0 010-2h1.07A6.002 6.002 0 019 4.07V3a1 1 0 011-1zm0 4a4 4 0 100 8 4 4 0 000-8zm0 2a2 2 0 110 4 2 2 0 010-4z" fill="currentColor"/>
+          </svg>
           打开 AI 问答
         </router-link>
       </div>
@@ -55,7 +57,10 @@
         </div>
         <div class="card-footer">
           <span v-if="model.status === 'active'" class="card-link">
-            进入 Dashboard →
+            进入 Dashboard
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </span>
           <span v-else class="card-coming">
             <span class="coming-dot" /> 即将上线
@@ -69,7 +74,10 @@
 
     <!-- 数据更新说明 -->
     <div class="update-info">
-      <span class="update-icon">🕐</span>
+      <svg viewBox="0 0 16 16" fill="none" width="14" height="14" style="flex-shrink:0; color:#94a3b8">
+        <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 5v3.5l2 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
       <span>日频数据每日 18:00 更新 &nbsp;|&nbsp; 季报数据季末披露后 T+3 更新</span>
       <span class="update-time">最后更新：2026-03-12</span>
     </div>
@@ -97,7 +105,7 @@ const models = [
     frequency: '日频',
     status: 'active',
     path: '/models/yield-curve',
-    color: 'linear-gradient(135deg, #6366f1, #818cf8)',
+    color: 'linear-gradient(135deg, #f97316, #ea580c)',
     icon: '<svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M3 3v18h18" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M7 16l4-5 4 3 5-6" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   },
   {
@@ -107,7 +115,7 @@ const models = [
     category: '基金分析',
     frequency: '季频',
     status: 'coming_soon',
-    color: 'linear-gradient(135deg, #0ea5e9, #38bdf8)',
+    color: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
     icon: '<svg viewBox="0 0 24 24" fill="none" width="22" height="22"><circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M12 12L12 3" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M12 12L19.5 16.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>',
   },
   {
@@ -117,7 +125,7 @@ const models = [
     category: '基金分析',
     frequency: '季频',
     status: 'coming_soon',
-    color: 'linear-gradient(135deg, #10b981, #34d399)',
+    color: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
     icon: '<svg viewBox="0 0 24 24" fill="none" width="22" height="22"><rect x="3" y="3" width="7" height="7" rx="1" stroke="white" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="white" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="white" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="white" stroke-width="1.8"/></svg>',
   },
   {
@@ -127,7 +135,7 @@ const models = [
     category: '市场分析',
     frequency: '日频',
     status: 'coming_soon',
-    color: 'linear-gradient(135deg, #f59e0b, #fbbf24)',
+    color: 'linear-gradient(135deg, #64748b, #475569)',
     icon: '<svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/></svg>',
   },
 ]
@@ -149,9 +157,22 @@ function handleModelClick(model) {
 
 /* 顶部 Banner */
 .page-header {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(135deg, #0c1a2e 0%, #0f172a 60%, #1a2a1a 100%);
   padding: 32px 32px 28px;
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-header::after {
+  content: '';
+  position: absolute;
+  right: -60px;
+  top: -60px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.12) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .page-header-inner {
@@ -159,6 +180,7 @@ function handleModelClick(model) {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  position: relative;
 }
 
 .page-title {
@@ -166,11 +188,12 @@ function handleModelClick(model) {
   font-weight: 700;
   color: #f1f5f9;
   margin-bottom: 8px;
+  letter-spacing: -0.3px;
 }
 
 .page-subtitle {
   font-size: 13px;
-  color: #94a3b8;
+  color: #64748b;
   line-height: 1.6;
 }
 
@@ -178,9 +201,9 @@ function handleModelClick(model) {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(129, 140, 248, 0.15);
-  border: 1px solid rgba(129, 140, 248, 0.35);
-  color: #818cf8;
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+  color: #fb923c;
   padding: 10px 20px;
   border-radius: 10px;
   font-size: 14px;
@@ -193,12 +216,10 @@ function handleModelClick(model) {
 }
 
 .ai-entry-btn:hover {
-  background: rgba(129, 140, 248, 0.25);
+  background: rgba(249, 115, 22, 0.25);
+  border-color: rgba(249, 115, 22, 0.6);
   transform: translateY(-1px);
-}
-
-.ai-btn-icon {
-  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
 }
 
 /* 统计行 */
@@ -223,7 +244,8 @@ function handleModelClick(model) {
   font-size: 20px;
   font-weight: 700;
   color: #1e293b;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
@@ -234,6 +256,7 @@ function handleModelClick(model) {
 .stat-trend {
   font-size: 12px;
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-trend.up { color: #ef4444; }
@@ -281,8 +304,8 @@ function handleModelClick(model) {
 }
 
 .model-card:hover:not(.coming-soon) {
-  border-color: #818cf8;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.12);
+  border-color: #f97316;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.12);
   transform: translateY(-2px);
 }
 
@@ -324,8 +347,8 @@ function handleModelClick(model) {
 }
 
 .badge.frequency {
-  background: #ede9fe;
-  color: #7c3aed;
+  background: #eff6ff;
+  color: #2563eb;
 }
 
 .card-title {
@@ -333,6 +356,7 @@ function handleModelClick(model) {
   font-weight: 600;
   color: #1e293b;
   margin-bottom: 6px;
+  letter-spacing: -0.1px;
 }
 
 .card-desc {
@@ -348,9 +372,17 @@ function handleModelClick(model) {
 }
 
 .card-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 13px;
-  color: #6366f1;
+  color: #ea580c;
   font-weight: 500;
+  transition: gap 0.18s ease;
+}
+
+.model-card:hover .card-link {
+  gap: 8px;
 }
 
 .card-coming {
@@ -365,13 +397,13 @@ function handleModelClick(model) {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: #cbd5e1;
 }
 
 .card-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,7 +1,14 @@
 <template>
   <div class="message-row" :class="role">
     <div class="avatar" :class="role">
-      {{ role === 'user' ? '你' : '✦' }}
+      <template v-if="role === 'user'">你</template>
+      <template v-else>
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+          <circle cx="10" cy="10" r="3.5" stroke="white" stroke-width="1.6"/>
+          <path d="M10 3v2M10 15v2M3 10h2M15 10h2" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M5.05 5.05l1.42 1.42M13.54 13.54l1.41 1.41M5.05 14.95l1.42-1.41M13.54 6.46l1.41-1.41" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </template>
     </div>
     <div class="content-wrap">
       <div class="bubble" :class="role">
@@ -64,14 +71,13 @@ const renderedContent = computed(() => {
 }
 
 .avatar.user {
-  background: linear-gradient(135deg, #4f8ef7, #3b5bdb);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #fff;
 }
 
 .avatar.assistant {
-  background: linear-gradient(135deg, #818cf8, #6366f1);
+  background: linear-gradient(135deg, #f97316, #ea580c);
   color: #fff;
-  font-size: 16px;
 }
 
 /* Bubble */
@@ -90,7 +96,7 @@ const renderedContent = computed(() => {
 }
 
 .bubble.user {
-  background: linear-gradient(135deg, #4f8ef7, #3b5bdb);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #fff;
   border-top-right-radius: 4px;
 }
@@ -107,7 +113,7 @@ const renderedContent = computed(() => {
   display: inline-block;
   width: 2px;
   height: 1em;
-  background: #6366f1;
+  background: #ea580c;
   margin-left: 2px;
   vertical-align: text-bottom;
   animation: blink 0.9s step-end infinite;
@@ -143,15 +149,15 @@ const renderedContent = computed(() => {
   line-height: 1.6;
 }
 .bubble.assistant :deep(code) {
-  font-family: 'Consolas', 'Monaco', 'Fira Code', monospace;
+  font-family: 'IBM Plex Mono', 'Consolas', 'Monaco', monospace;
 }
 .bubble.assistant :deep(p > code) {
-  background: #f1f5f9;
-  color: #6366f1;
+  background: #fff7ed;
+  color: #ea580c;
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 13px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #fed7aa;
 }
 .bubble.assistant :deep(ul),
 .bubble.assistant :deep(ol) {
@@ -179,11 +185,11 @@ const renderedContent = computed(() => {
   color: #475569;
 }
 .bubble.assistant :deep(blockquote) {
-  border-left: 3px solid #818cf8;
+  border-left: 3px solid #f97316;
   margin: 8px 0;
   padding: 4px 12px;
   color: #64748b;
-  background: #f8fafc;
+  background: #fff7ed;
   border-radius: 0 6px 6px 0;
 }
 .bubble.assistant :deep(hr) {

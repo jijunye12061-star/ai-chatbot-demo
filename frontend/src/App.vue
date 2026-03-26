@@ -110,7 +110,7 @@ const modelsExpanded = ref(true)
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: #f0f4f8;
   overflow: hidden;
 }
@@ -133,7 +133,7 @@ a {
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: #1e293b;
+  background: #0c1a2e;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -152,7 +152,7 @@ a {
 .logo-icon {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #818cf8, #6366f1);
+  background: linear-gradient(135deg, #f97316, #ea580c);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -180,7 +180,7 @@ a {
 
 .logo-sub {
   font-size: 10px;
-  color: #64748b;
+  color: #475569;
   letter-spacing: 1px;
   margin-top: 1px;
 }
@@ -201,19 +201,19 @@ a {
   cursor: pointer;
   transition: all 0.18s ease;
   border-radius: 0;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 14px;
   position: relative;
 }
 
 .nav-item:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 .nav-item.active {
-  background: rgba(129, 140, 248, 0.15);
-  color: #818cf8;
+  background: rgba(249, 115, 22, 0.12);
+  color: #fb923c;
 }
 
 .nav-item.active::before {
@@ -223,7 +223,7 @@ a {
   top: 4px;
   bottom: 4px;
   width: 3px;
-  background: #818cf8;
+  background: #f97316;
   border-radius: 0 2px 2px 0;
 }
 
@@ -249,15 +249,15 @@ a {
 .nav-badge {
   font-size: 10px;
   font-weight: 600;
-  background: rgba(129, 140, 248, 0.2);
-  color: #818cf8;
+  background: rgba(249, 115, 22, 0.18);
+  color: #fb923c;
   padding: 2px 6px;
   border-radius: 4px;
   flex-shrink: 0;
 }
 
 .nav-arrow {
-  color: #64748b;
+  color: #475569;
   display: flex;
   align-items: center;
   transition: transform 0.2s ease;
@@ -280,13 +280,13 @@ a {
   padding: 9px 18px;
   cursor: pointer;
   transition: all 0.18s ease;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 14px;
 }
 
 .nav-group-title:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 /* 子菜单 */
@@ -301,7 +301,7 @@ a {
   gap: 8px;
   padding: 7px 12px 7px 0;
   font-size: 13px;
-  color: #64748b;
+  color: #475569;
   cursor: pointer;
   transition: color 0.15s;
   position: relative;
@@ -312,32 +312,32 @@ a {
 }
 
 .nav-sub-item.active {
-  color: #818cf8;
+  color: #fb923c;
 }
 
 .nav-sub-item.disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .sub-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #475569;
+  background: #334155;
   flex-shrink: 0;
   transition: background 0.15s;
 }
 
 .nav-sub-item.active .sub-dot {
-  background: #818cf8;
+  background: #f97316;
 }
 
 .coming-tag {
   font-size: 10px;
-  color: #64748b;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #475569;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 1px 5px;
   border-radius: 3px;
   margin-left: auto;
@@ -368,7 +368,7 @@ a {
 
 .model-name {
   font-size: 12px;
-  color: #64748b;
+  color: #475569;
 }
 
 /* ========== 主内容 ========== */
