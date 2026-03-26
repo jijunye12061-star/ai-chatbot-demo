@@ -5,7 +5,7 @@ import json
 from db.safety import validate_sql
 from db.connection import execute_query
 from tools.tool_result import ToolResult
-from utils.serializers import json_default
+from utils.serializers import json_default, serialize_row
 
 _PREVIEW_ROWS = 5  # 进入 LLM 上下文的最大行数
 
@@ -59,7 +59,7 @@ def execute_sql(sql: str, explanation: str = "") -> ToolResult:
     # 行数 > _PREVIEW_ROWS 时，保留完整数据供前端 Excel 下载
     if total > _PREVIEW_ROWS:
         columns = list(rows[0].keys()) if rows else []
-        full_rows = [list(row.values()) for row in rows]
+        full_rows = [list(serialize_row(row).values()) for row in rows]
     else:
         columns = None
         full_rows = None

@@ -16,6 +16,7 @@ from typing import AsyncGenerator
 from llm.client import chat_completion, stream_text
 from tools.registry import get_tool_schemas, get_tool_func
 from tools.tool_result import ToolResult
+from utils.conv_logger import get_conv_logger
 
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
 
@@ -85,6 +86,10 @@ class BaseAgent:
                     display = _TOOL_DISPLAY_NAMES.get(tool_name, tool_name)
                     print(f"[{self.name}] 调用工具: {tool_name}, args: {tc.function.arguments[:200]}")
 
+                    _log = get_conv_logger()
+                    if _log:
+                        _log.tool_call(tool_name, tc.function.arguments)
+
                     # 思考步骤：开始
                     yield _thinking(step=f"正在{display}...", status="running")
 
@@ -93,6 +98,8 @@ class BaseAgent:
                     if isinstance(result, ToolResult):
                         # 思考步骤：完成
                         yield _thinking(step=f"{display}完成", status="done")
+                        if _log:
+                            _log.tool_result(tool_name, result.summary)
                         # result_data 旁路：完整数据直达前端，不进 LLM
                         if result.has_full_data:
                             yield _sse({
@@ -107,6 +114,8 @@ class BaseAgent:
                             yield _thinking(step=f"{display}失败", status="error")
                         else:
                             yield _thinking(step=f"{display}完成", status="done")
+                        if _log:
+                            _log.tool_result(tool_name, str(result))
                         tool_content = str(result)
 
                     full_messages.append({

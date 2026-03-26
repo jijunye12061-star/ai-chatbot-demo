@@ -173,6 +173,7 @@ project/
 | 文件                        | 职责                                              |
 |---------------------------|-------------------------------------------------|
 | `utils/serializers.py`    | 公共 JSON 序列化辅助：处理 Decimal / datetime 类型，供工具层共用 |
+| `utils/conv_logger.py`    | 对话日志：每次请求写一个独立 log 文件到 `backend/logs/`，contextvars 保证并发隔离 |
 
 ### 测试 (`tests/`)
 
