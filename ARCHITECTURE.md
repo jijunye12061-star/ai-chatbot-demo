@@ -57,8 +57,10 @@ project/
 | 文件                       | 职责                                                  |
 |--------------------------|-----------------------------------------------------|
 | `chat/ChatWindow.vue`    | 消息列表容器：空状态（建议问题卡片）+ 消息气泡列表 + 自动滚动                   |
-| `chat/MessageBubble.vue` | 单条消息气泡：区分 user/assistant 样式，assistant 消息渲染 Markdown |
+| `chat/MessageBubble.vue` | Claude 风格消息气泡：user 右对齐气泡，assistant 无气泡左对齐，支持 Markdown 渲染 + thinking/result 嵌套组件 |
 | `chat/ChatInput.vue`     | 输入框组件：自动高度 textarea、发送按钮、Enter 发送 / Shift+Enter 换行  |
+| `chat/ThinkingTimeline.vue` | 思考时间轴组件：折叠/展开状态切换，running/done/error 胶囊状态点，YAML 格式思考内容展示 |
+| `chat/ResultTable.vue`   | 结构化查询结果预览表格：前 5 条数据展示 + SheetJS 库 Excel 下载功能 |
 
 #### `components/charts/`（待创建）
 
@@ -90,7 +92,7 @@ project/
 
 | 文件              | 路由                | 职责                                                                                 |
 |-----------------|-------------------|------------------------------------------------------------------------------------|
-| `api/chat.py`   | `POST /api/chat`  | 接收 `{message, history}`，调用 `llm_service.stream_chat()`，返回 `StreamingResponse`（SSE） |
+| `api/chat.py`   | `POST /api/chat`  | 接收 `{message, history}`，调用 `orchestrator.run()`，透传 base.py 预格式化 SSE 事件（thinking/content/result_data）给前端 |
 | `api/models.py` | `GET /api/models` | 返回平台所有模型的元数据（id、名称、状态等）；`GET /api/models/{id}/data` 占位（待接入 DB）                     |
 
 ### 服务层 (`services/`)
@@ -117,7 +119,7 @@ project/
 | 文件                          | 职责                                                                                       |
 |-----------------------------|------------------------------------------------------------------------------------------|
 | `agents/orchestrator.py`    | 总调度入口：message + history → 直接实例化 MainAgent → 流式输出（已简化，无 RouterAgent）                    |
-| `agents/base.py`            | BaseAgent 基类：Function Calling 循环（检测 tool_calls → 执行 → 流式最终回复）                          |
+| `agents/base.py`            | BaseAgent 基类：FC 循环 + 预格式化 SSE 事件 yield，按 type 分为 thinking/content/result_data，供前端路由处理                          |
 | `agents/main_agent.py`      | 单一主 Agent：注入 table_catalog + screen_catalog，使用全部 5 个工具，处理数据查询/基金筛选/报告/闲聊 |
 | `agents/report_agent.py`    | 报告生成 subagent，先提示再调用 generate_fund_report 工具，由 report_agent_bridge 调用               |
 
@@ -127,7 +129,8 @@ project/
 |---------------------------------|--------------------------------------------------------------------------------------------------|
 | `tools/registry.py`             | 工具注册表，延迟加载避免循环导入                                                                                 |
 | `tools/definitions.py`          | 所有工具的 JSON Schema：execute_sql / get_table_schema / get_dimension_list / get_screen_guide / generate_fund_report（共 5 个）|
-| `tools/sql_executor.py`         | LLM SQL → safety.validate_sql → 只读执行 → JSON 结果                                                   |
+| `tools/tool_result.py`          | ToolResult 数据类：summary（描述信息）+ full_rows（完整数据行）+ columns（列定义），sql_executor 的结构化返回值       |
+| `tools/sql_executor.py`         | LLM SQL → safety.validate_sql → 只读执行 → ToolResult（包含 summary/full_rows/columns）                    |
 | `tools/schema_reader.py`        | `get_table_schema(tables)` → 读取 templates/table_specs/*.md → 返回拼接的字段说明                           |
 | `tools/dimension_lookup.py`     | `get_dimension_list(dim_type)` → 查 tb_dict_params → 返回概念/行业码 JSON                               |
 | `tools/screen_guide_reader.py`  | `get_screen_guide(guide_name)` → 读取 templates/screen_guides/*.md → 返回筛选知识文档，供 AI 写 SQL 参考        |
