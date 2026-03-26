@@ -36,6 +36,7 @@ Thumbs.db
 # docs
 docs/table_specs_source
 docs/superpowers/
+.superpowers/
 
 # Git worktrees
 .worktrees/
