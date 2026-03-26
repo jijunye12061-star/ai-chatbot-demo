@@ -35,6 +35,10 @@
       :role="msg.role"
       :content="msg.content"
       :streaming="msg.streaming"
+      :thinking-steps="msg.thinkingSteps || []"
+      :thinking-collapsed="msg.thinkingCollapsed ?? false"
+      :result-data="msg.resultData || null"
+      @update:thinking-collapsed="toggleThinkingCollapsed(i, $event)"
     />
   </div>
 </template>
@@ -42,9 +46,15 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import MessageBubble from './MessageBubble.vue'
+import { useChatStore } from '../../stores/chat.js'
 
 const props = defineProps({ messages: Array })
 defineEmits(['suggest'])
+
+const store = useChatStore()
+function toggleThinkingCollapsed(index, val) {
+  store.messages[index].thinkingCollapsed = val
+}
 
 const suggestions = [
   {
@@ -79,6 +89,7 @@ watch(
   flex: 1;
   overflow-y: auto;
   padding: 20px 0 8px;
+  background: #f7f5f2;
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
 }
