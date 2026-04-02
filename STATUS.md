@@ -1,27 +1,24 @@
 # 项目状态快照
 
-**更新时间**：2026-03-26
+**更新时间**：2026-04-02
 
 ## 当前阶段
 
-Phase 1 完成：思考时间轴 + 结构化结果展示已实现
+Phase 1 完成，Phase 2 启动中（框架已搭好，数据待接入）
 
-## 最近完成（2026-03-26）
+## 最近完成（2026-04-02）
 
-- **Bug 修复**：`execute_sql` 返回 `full_rows` 时未序列化 Decimal，导致 JSON 序列化失败；
-  修复：`sql_executor.py` 用 `serialize_row()` 转换每一行再存入 `full_rows`
-- **对话日志**：新增 `utils/conv_logger.py`；每次请求在 `backend/logs/` 生成独立 `.log` 文件，
-  记录工具调用链（name/args/result）+ LLM 最终回复，用于 debug；`backend/logs/` 已加入 `.gitignore`
+- **数据库架构切换**：dev 环境从 Docker MySQL 迁移到远程 SQL 查询服务
+  - 内网部署 FastAPI SQL 服务（10.189.26.145:9033），经堡垒机反向代理到公网
+  - `config.py` dev 模式改为 remote，通过 HTTP 查询 Doris 真实数据
+  - `db/connection.py` 支持 remote/direct 双模式，对上层透明
+  - 不再依赖本地 Docker MySQL
 
 ## 历史完成
 
-- 思考时间轴：base.py 改造为 yield 预格式化 SSE 事件（thinking/content/result_data）
-- ToolResult 数据类：sql_executor 返回 ToolResult，full_rows 旁路直达前端
-- 前端 SSE 路由：api/chat.js 按 type 路由；chat store 新增 thinkingSteps/resultData 字段
-- ThinkingTimeline.vue：折叠/展开时间轴组件（running/done/error 状态）
-- ResultTable.vue：前 5 条预览表格 + SheetJS Excel 下载
-- MessageBubble.vue 重构：Claude 风格无气泡助手消息
-- 测试：30 passed（含 base SSE / sql_executor ToolResult / tool_result 数据类）
+- 思考时间轴 + 结构化结果展示（ThinkingTimeline / ResultTable）
+- 对话日志（conv_logger）、Decimal 序列化修复
+- 侧边栏导航布局、路由 `/`, `/chat`, `/models/yield-curve`
 
 ## 下一步
 
@@ -31,6 +28,5 @@ Phase 1 完成：思考时间轴 + 结构化结果展示已实现
 ## 关键约束
 
 - LLM: DeepSeek-V3，东财 API 代理（LLM_API_KEY 环境变量）
-- 本地 DB: Docker MySQL，dev-mysql 容器，fund_platform 库
+- 开发 DB: 远程 SQL 服务（REMOTE_SQL_TOKEN 环境变量），经堡垒机代理查 Doris
 - 后端端口: 8000，前端端口: 5173
-- 功能分支: feature/thinking-timeline（待合并 main）

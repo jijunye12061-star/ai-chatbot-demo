@@ -20,13 +20,12 @@ ENV = os.getenv("APP_ENV", "dev")
 # 数据库配置
 DB_CONFIG = {
     "dev": {
-        "host": "127.0.0.1",
-        "port": 3306,
-        "user": "root",
-        "password": "dev",
-        "database": "fund_platform",
+        "mode": "remote",
+        "url": os.getenv("REMOTE_SQL_URL", "https://tytapitest.1234567.com.cn/ty/sql"),
+        "token": os.getenv("REMOTE_SQL_TOKEN", ""),
     },
     "prod": {
+        "mode": "direct",
         "host": os.getenv("DORIS_HOST", ""),
         "port": 9030,
         "user": os.getenv("DORIS_USER", ""),

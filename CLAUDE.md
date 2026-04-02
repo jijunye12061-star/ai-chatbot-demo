@@ -38,7 +38,7 @@
 
 - **Frontend**: Vue 3 + Vite, Composition API (`<script setup>`), Markdown 渲染
 - **Backend**: FastAPI (Python 3.11+), 类型注解, SSE 流式返回
-- **Database**: Docker MySQL 8.0（本地开发） / Doris（生产），详见 `docs/dev/local-db.md`
+- **Database**: 远程 SQL 服务（开发，经堡垒机反向代理访问 Doris） / Doris 直连（生产），详见 `docs/dev/remote-db.md`
 - **LLM**: DeepSeek-V3（东财 API 代理），通过 `backend/config.py` 配置，`LLM_API_KEY` 环境变量注入
 - **Communication**: SSE — `data: {"content": "...", "done": false}`
 
@@ -52,8 +52,8 @@ cd backend && uvicorn main:app --reload --port 8000
 cd frontend && npm run dev     # Dev server, /api 代理到 :8000
 cd frontend && npm run build   # 生产构建
 
-# 数据库
-docker start dev-mysql
+# 数据库（dev 环境无需本地数据库，通过远程 SQL 服务查询 Doris）
+# 确保 backend/.env 中配置了 REMOTE_SQL_TOKEN
 ```
 
 ## API Contract
@@ -87,5 +87,5 @@ data: {"content": "", "done": true}
 - `llm/client.py` 是唯一调用 LLM 的地方；`agents/orchestrator.py` 是 AI 请求总入口
 - 多 Agent 分层：Router → Orchestrator → Agent → Tool，详见 `docs/requirements/03-ai-agent.md`
 - 多轮对话上下文由前端以 `history` 传入，后端无状态
-- 环境切换通过 `APP_ENV` 环境变量（dev / prod）
+- 环境切换通过 `APP_ENV` 环境变量：dev（远程 SQL 服务） / prod（Doris 直连）
 - 暂不实现：登录鉴权、对话持久化、token 截断、主题定制

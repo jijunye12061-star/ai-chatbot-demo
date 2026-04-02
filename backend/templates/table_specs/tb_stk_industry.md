@@ -66,4 +66,21 @@ WHERE p.c_fd_code = '000001'
 GROUP BY LEFT(i.c_citic_code, 6), d.c_param_name
 ORDER BY total_mv DESC
 LIMIT 20;
+
+-- 筛选重仓某申万行业的基金（如电子行业 029005，持仓占比≥5%）
+-- 注意：tb_stk_industry 是股票→行业的映射，不要用 tb_dict_params 做此关联
+SELECT p.c_fd_code,
+       b.c_short_name                  AS fund_name,
+       SUM(p.c_nav_ratio)              AS industry_nav_ratio
+FROM tb_fd_portfolio_stk p
+JOIN tb_stk_industry i
+     ON p.c_stk_code = i.c_stk_code
+     AND p.c_report_date = i.c_trade_date   -- 持仓报告期对应行业日期
+JOIN tb_fd_basic_info b ON p.c_fd_code = b.c_fd_code
+WHERE p.c_report_date = '2025-12-31'
+  AND p.c_style = '06'                      -- 06=A股股票持仓
+  AND LEFT(i.c_sw_code, 6) = '029005'       -- 申万电子行业一级，截取6位
+GROUP BY p.c_fd_code, b.c_short_name
+HAVING industry_nav_ratio >= 5
+ORDER BY industry_nav_ratio DESC;
 ```

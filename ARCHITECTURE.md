@@ -105,7 +105,7 @@ project/
 
 | 文件                 | 职责                                                             |
 |--------------------|----------------------------------------------------------------|
-| `db/connection.py` | `get_connection(readonly)` / `execute_query()`，支持只读账号切换        |
+| `db/connection.py` | `execute_query()` 统一入口：dev 走远程 SQL 服务（HTTP），prod 走 Doris 直连（pymysql） |
 | `db/safety.py`     | SQL 安全校验：危险关键词检测 → 单语句 → SELECT only → 白名单表 → 子查询深度 → LIMIT 注入 |
 
 ### LLM 层 (`llm/`)
@@ -194,7 +194,7 @@ project/
 | `data/import.py` | CSV 批量导入脚本：读 11 个 CSV → 类型转换 → INSERT（pandas + mysql-connector） |
 | `data/test_chat.py` | 后端 AI 问答测试脚本：直接 POST /api/chat，流式打印，无需前端 |
 
-详细说明见 `docs/local_dev_db.md`：容器名 `dev-mysql`、端口 3306、库名 `fund_platform`、root/dev。
+详细说明见 `docs/dev/remote-db.md`：远程 SQL 服务架构、Token 认证、内网部署方式。
 
 ## 文档 (`docs/`)
 
