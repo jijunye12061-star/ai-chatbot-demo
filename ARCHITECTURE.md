@@ -10,8 +10,8 @@
 project/
 ├── frontend/          # Vue 3 + Vite SPA
 ├── backend/           # FastAPI 后端
-├── docs/              # 需求文档
-├── data/              # 本地测试数据（SQL schema、CSV）
+├── docs/              # 需求 + 开发文档
+├── data/              # 测试脚本
 ├── CLAUDE.md          # 项目总览 + 开发规范（本文件的上级）
 ├── ARCHITECTURE.md    # 本文件：代码地图
 └── CHANGELOG.md       # 开发日志
@@ -188,13 +188,11 @@ project/
 
 ## 数据 (`data/`)
 
-| 文件                      | 职责                              |
-|-------------------------|---------------------------------|
-| `data/schema_mysql.sql` | 建表脚本（11 张表），用于初始化本地 Docker MySQL |
-| `data/import.py` | CSV 批量导入脚本：读 11 个 CSV → 类型转换 → INSERT（pandas + mysql-connector） |
-| `data/test_chat.py` | 后端 AI 问答测试脚本：直接 POST /api/chat，流式打印，无需前端 |
+| 文件                 | 职责                                         |
+|--------------------|--------------------------------------------|
+| `data/test_chat.py` | 后端 AI 问答测试脚本：直接调用 orchestrator，流式打印，无需启动后端服务 |
 
-详细说明见 `docs/dev/remote-db.md`：远程 SQL 服务架构、Token 认证、内网部署方式。
+> 开发数据库说明见 `docs/dev/remote-db.md`。
 
 ## 文档 (`docs/`)
 
@@ -205,7 +203,7 @@ project/
 | `docs/requirements/02-model-display.md`    | 模型展示系统设计需求                                   |
 | `docs/requirements/03-ai-agent.md`         | AI 问答 + 多 Agent 架构设计                         |
 | `docs/requirements/04-api-contract.md`     | 前后端 API 契约（请求/响应格式、SSE 协议）                   |
-| `docs/dev/local-db.md`                     | 本地开发数据库说明：容器信息、建表、数据导入/导出、新增表操作清单            |
+| `docs/dev/remote-db.md`                    | 开发数据库说明：远程 SQL 服务架构、内网部署、Token 认证、新增表操作清单   |
 | `docs/specs/2026-03-24-fund-screening-design.md` | 基金筛选功能设计文档（模板002-007 + 重构方案）           |
 | `docs/fund_screener_cases.md`              | 新增：基金筛选问题池（9个场景 case，含期望路径和状态）              |
 | `docs/table_specs_source/`                 | 各表的规格定义源文件（含 16 张表，含 7 张未实现的股票/债券表），是扩表的前置参考 |
@@ -239,7 +237,7 @@ project/
 YieldCurve.vue 挂载
   → api/models.js fetchModels() → GET /api/models/{id}/data
   → backend: api/models.py → model_data_service.get_yield_curve_data()
-  → MySQL / Doris → 返回数据
+  → execute_query() → 远程 SQL 服务(dev) / Doris 直连(prod)
   → 图表渲染
 ```
 

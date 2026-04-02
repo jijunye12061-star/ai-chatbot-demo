@@ -4,6 +4,37 @@
 
 ---
 
+## [2026-04-02] 开发数据库从 Docker MySQL 迁移到远程 SQL 服务
+
+### 完成内容
+
+#### 内网 SQL 查询服务
+- 在内网机器（10.189.26.145:9033）部署 FastAPI SQL 服务，经堡垒机反向代理到公网
+- Token 认证 + IP 白名单（CIDR 网段）+ 只读校验 + 行数限制 + 超时控制
+- 日志记录（请求 SQL + 错误堆栈），写入 `logs/service.log`
+- Decimal/date/bytes 自动序列化为 JSON 兼容类型
+
+#### 后端集成
+- `config.py`：dev 环境改为 remote 模式，通过 HTTP 查询 Doris 真实数据
+- `db/connection.py`：`execute_query()` 支持 remote/direct 双模式，对上层透明
+- `.env` 新增 `REMOTE_SQL_TOKEN` 配置
+
+#### 清理废弃文件
+- 删除 `data/schema_mysql.sql`（Docker MySQL 建表脚本）
+- 删除 `data/import.py`（CSV 导入 Docker MySQL 脚本）
+- 删除 `docs/dev/local-db.md`，新建 `docs/dev/remote-db.md`（含完整内网服务部署文档）
+- `.env.example` 更新，补充远程 SQL 服务配置项
+
+#### 文档同步
+- `CLAUDE.md`、`ARCHITECTURE.md`、`STATUS.md`、`docs/README.md` 全部更新
+
+### 验证
+- 远程 SQL 服务 4 项测试全部通过（SELECT 1 / COUNT / MAX / 多列查询）
+- AI 问答端到端测试通过（查最新持仓日期 / 筛选重仓电子行业基金）
+- 现有单测 8 passed，未引入破坏性变更
+
+---
+
 ## [2026-03-23] 文档结构重组
 
 ### 完成内容
